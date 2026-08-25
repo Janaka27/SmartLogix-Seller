@@ -24,8 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ProductFormDialog } from "@/components/seller/ProductFormDialog";
+import { ProductFormDialog, type ProductFormSubmitValues } from "@/components/seller/ProductFormDialog";
 import { BulkStockDialog } from "@/components/seller/BulkStockDialog";
 import {
   WarehouseFormDialog,
@@ -75,6 +81,7 @@ export default function SellerInventoryPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
 
   const [sellerId, setSellerId] = useState<string | null>(null);
   const [sellerWarehouse, setSellerWarehouse] = useState<SellerWarehouse | null>(null);
@@ -163,19 +170,7 @@ export default function SellerInventoryPage() {
     setDialogOpen(true);
   };
 
-  const handleSave = async (values: {
-    name: string;
-    description: string;
-    category: string;
-    price: number;
-    stockQty: number;
-    weightKg: number;
-    lengthCm: number;
-    widthCm: number;
-    heightCm: number;
-    fragile: boolean;
-    status: ProductStatus;
-  }) => {
+  const handleSave = async (values: ProductFormSubmitValues) => {
     const volumeCm3 = values.lengthCm * values.widthCm * values.heightCm;
 
     try {
@@ -308,7 +303,29 @@ export default function SellerInventoryPage() {
                 <TableBody>
                   {filteredProducts.map((product) => (
                     <TableRow key={product.id}>
-                      <TableCell className="font-medium text-foreground">{product.name}</TableCell>
+                      <TableCell className="font-medium text-foreground">
+                        <div className="flex items-center gap-3">
+                          {product.images?.[0] ? (
+                            <button
+                              type="button"
+                              onClick={() => setPreviewProduct(product)}
+                              className="shrink-0 cursor-zoom-in rounded-md ring-offset-1 transition hover:ring-2 hover:ring-primary"
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={product.images[0]}
+                                alt={product.name}
+                                className="h-9 w-9 rounded-md border border-border object-cover"
+                              />
+                            </button>
+                          ) : (
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-border bg-muted text-muted-foreground">
+                              <Package className="h-4 w-4" />
+                            </span>
+                          )}
+                          <span>{product.name}</span>
+                        </div>
+                      </TableCell>
                       <TableCell className="text-muted-foreground">{product.category}</TableCell>
                       <TableCell>{formatCurrency(product.price)}</TableCell>
                       <TableCell>{product.stockQty}</TableCell>
@@ -426,6 +443,28 @@ export default function SellerInventoryPage() {
         products={products}
         onSave={handleBulkSave}
       />
+
+      <Dialog
+        open={!!previewProduct}
+        onOpenChange={(open) => !open && setPreviewProduct(null)}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{previewProduct?.name}</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-2 gap-3">
+            {previewProduct?.images.map((url, i) => (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={url}
+                src={url}
+                alt={`${previewProduct.name} ${i + 1}`}
+                className="aspect-square w-full rounded-lg border border-border object-cover"
+              />
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

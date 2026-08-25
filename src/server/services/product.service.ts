@@ -15,6 +15,7 @@ export interface ProductInput {
     heightCm: number;
     fragile: boolean;
     status: string;
+    images: string[];
     volumeCm3?: number;
     sellerId?: string;
     warehouseId?: string;
@@ -36,6 +37,7 @@ function mapToFrontend(dbProduct: any) {
         heightCm: dbProduct.height_cm,
         volumeCm3: dbProduct.volume_cm3,
         fragile: dbProduct.fragile,
+        images: dbProduct.images || [],
         status: dbProduct.status,
         sellerId: dbProduct.seller_id,
         warehouseId: dbProduct.warehouse_id,
@@ -73,6 +75,7 @@ export const ProductService = {
             height_cm: productData.heightCm,
             fragile: productData.fragile,
             status: productData.status,
+            images: productData.images,
             seller_id: productData.sellerId,
             warehouse_id: productData.warehouseId,
         };
@@ -106,6 +109,7 @@ export const ProductService = {
         if (updates.heightCm !== undefined) dbInput.height_cm = updates.heightCm;
         if (updates.fragile !== undefined) dbInput.fragile = updates.fragile;
         if (updates.status !== undefined) dbInput.status = updates.status;
+        if (updates.images !== undefined) dbInput.images = updates.images;
         if (updates.sellerId !== undefined) dbInput.seller_id = updates.sellerId;
         if (updates.warehouseId !== undefined) dbInput.warehouse_id = updates.warehouseId;
 

@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { ImagePlus, Loader2, X } from "lucide-react";
 
 import {
   Dialog,
@@ -48,12 +49,24 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
+export type ProductFormSubmitValues = ProductFormValues & { images: string[] };
+
 interface ProductFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product?: Product | null;
   warehouseName: string;
-  onSave: (values: ProductFormValues) => void;
+  onSave: (values: ProductFormSubmitValues) => void;
+}
+
+const MIN_IMAGES = 2;
+const MAX_IMAGES = 6;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+
+interface NewImageFile {
+  file: File;
+  previewUrl: string;
 }
 
 const EMPTY_VALUES: ProductFormValues = {
@@ -89,6 +102,11 @@ export function ProductFormDialog({
     defaultValues: EMPTY_VALUES,
   });
 
+  const [existingImages, setExistingImages] = useState<string[]>([]);
+  const [newImages, setNewImages] = useState<NewImageFile[]>([]);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [uploadingImages, setUploadingImages] = useState(false);
+
   useEffect(() => {
     if (open) {
       reset(
@@ -108,21 +126,111 @@ export function ProductFormDialog({
             }
           : EMPTY_VALUES
       );
+      setExistingImages(product?.images ?? []);
+      setNewImages((prev) => {
+        prev.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+        return [];
+      });
+      setImageError(null);
     }
   }, [open, product, reset]);
+
+  // Revoke object URLs for previews when the dialog unmounts.
+  useEffect(() => {
+    return () => {
+      newImages.forEach((img) => URL.revokeObjectURL(img.previewUrl));
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const totalImageCount = existingImages.length + newImages.length;
+
+  const handleFilesSelected = (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const incoming = Array.from(fileList);
+    const room = MAX_IMAGES - totalImageCount;
+
+    if (room <= 0) {
+      setImageError(`You can add up to ${MAX_IMAGES} images.`);
+      return;
+    }
+
+    const accepted: NewImageFile[] = [];
+    for (const file of incoming.slice(0, room)) {
+      if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+        setImageError(`${file.name} isn't a supported image type.`);
+        continue;
+      }
+      if (file.size > MAX_IMAGE_BYTES) {
+        setImageError(`${file.name} exceeds the 5MB limit.`);
+        continue;
+      }
+      accepted.push({ file, previewUrl: URL.createObjectURL(file) });
+    }
+
+    if (accepted.length > 0) {
+      setImageError(null);
+      setNewImages((prev) => [...prev, ...accepted]);
+    }
+  };
+
+  const removeExistingImage = (url: string) => {
+    setExistingImages((prev) => prev.filter((img) => img !== url));
+  };
+
+  const removeNewImage = (previewUrl: string) => {
+    setNewImages((prev) => {
+      const target = prev.find((img) => img.previewUrl === previewUrl);
+      if (target) URL.revokeObjectURL(target.previewUrl);
+      return prev.filter((img) => img.previewUrl !== previewUrl);
+    });
+  };
 
   const [lengthCm, widthCm, heightCm] = watch(["lengthCm", "widthCm", "heightCm"]);
   const volumeCm3 = (lengthCm || 0) * (widthCm || 0) * (heightCm || 0);
   const volumeExceeded = volumeCm3 > MAX_FLEET_CARGO_VOLUME_CM3;
 
-  const onSubmit = (values: ProductFormValues) => {
+  const onSubmit = async (values: ProductFormValues) => {
     if (volumeExceeded) {
       toast.error("Product exceeds the largest drone's cargo bay envelope.");
       return;
     }
-    onSave(values);
-    toast.success(product ? "Product updated" : "Product added");
-    onOpenChange(false);
+
+    if (totalImageCount < MIN_IMAGES) {
+      setImageError(`Add at least ${MIN_IMAGES} product images.`);
+      return;
+    }
+
+    try {
+      let uploadedUrls: string[] = [];
+      if (newImages.length > 0) {
+        setUploadingImages(true);
+        const formData = new FormData();
+        newImages.forEach((img) => formData.append("files", img.file));
+
+        const response = await fetch("/api/products/images", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || "Failed to upload images");
+        }
+
+        const body = await response.json();
+        uploadedUrls = body.urls as string[];
+      }
+
+      onSave({ ...values, images: [...existingImages, ...uploadedUrls] });
+      toast.success(product ? "Product updated" : "Product added");
+      onOpenChange(false);
+    } catch (err) {
+      console.error("Failed to upload product images", err);
+      toast.error(err instanceof Error ? err.message : "Failed to upload images");
+    } finally {
+      setUploadingImages(false);
+    }
   };
 
   return (
@@ -149,6 +257,65 @@ export function ProductFormDialog({
             {errors.description && (
               <p className="text-xs text-destructive">{errors.description.message}</p>
             )}
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <Label>Product images</Label>
+              <span className="text-xs text-muted-foreground">
+                {totalImageCount}/{MAX_IMAGES} · min {MIN_IMAGES}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {existingImages.map((url) => (
+                <div key={url} className="group relative aspect-square overflow-hidden rounded-lg border border-border">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={url} alt="Product" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeExistingImage(url)}
+                    className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {newImages.map((img) => (
+                <div
+                  key={img.previewUrl}
+                  className="group relative aspect-square overflow-hidden rounded-lg border border-border"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.previewUrl} alt="Product" className="h-full w-full object-cover" />
+                  <button
+                    type="button"
+                    onClick={() => removeNewImage(img.previewUrl)}
+                    className="absolute right-1 top-1 rounded-full bg-black/60 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100"
+                    aria-label="Remove image"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {totalImageCount < MAX_IMAGES && (
+                <label className="flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-border text-muted-foreground hover:bg-muted/50">
+                  <ImagePlus className="h-5 w-5" />
+                  <span className="text-[10px]">Add</span>
+                  <input
+                    type="file"
+                    accept={ALLOWED_IMAGE_TYPES.join(",")}
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      handleFilesSelected(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+            {imageError && <p className="text-xs text-destructive">{imageError}</p>}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -245,7 +412,11 @@ export function ProductFormDialog({
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting || volumeExceeded}>
+            <Button
+              type="submit"
+              disabled={isSubmitting || uploadingImages || volumeExceeded || totalImageCount < MIN_IMAGES}
+            >
+              {uploadingImages && <Loader2 className="h-4 w-4 animate-spin" />}
               {product ? "Save changes" : "Add product"}
             </Button>
           </DialogFooter>
