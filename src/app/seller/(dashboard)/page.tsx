@@ -48,7 +48,7 @@ export default function SellerDashboardPage() {
         title="Dashboard"
         description="Here's how Torri Home Goods is doing."
         actions={
-          <Button nativeButton={false} render={<Link href="/seller/products" />}>
+          <Button nativeButton={false} render={<Link href="/seller/inventory" />}>
             <Package /> Add Product
           </Button>
         }
