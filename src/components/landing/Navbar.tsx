@@ -63,7 +63,7 @@ export default function Navbar() {
 
         <div className="hidden lg:block">
           <a
-            href="#contact"
+            href="/seller/register"
             className="rounded-full bg-white px-5 py-2.5 text-sm font-semibold text-slate-900 shadow-sm transition hover:bg-white/90"
           >
             Become a Seller
@@ -110,7 +110,7 @@ export default function Navbar() {
               </a>
             ))}
             <a
-              href="#contact"
+              href="/seller/register"
               onClick={() => setOpen(false)}
               className="mt-2 rounded-lg bg-white px-4 py-2.5 text-center text-sm font-semibold text-slate-900"
             >

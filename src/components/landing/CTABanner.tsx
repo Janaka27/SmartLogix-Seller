@@ -10,7 +10,7 @@ export default function CTABanner() {
           to get orders to buyers in minutes.
         </p>
         <a
-          href="#contact"
+          href="/seller/register"
           className="rounded-full bg-orange-500 px-7 py-3.5 text-sm font-semibold text-white shadow-lg shadow-orange-500/25 transition hover:bg-orange-400"
         >
           Become a Seller Today

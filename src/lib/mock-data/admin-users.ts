@@ -1,0 +1,57 @@
+import type { AdminUser } from "@/lib/types";
+
+export const adminUsers: AdminUser[] = [
+  {
+    id: "au-01",
+    name: "Priya Shah",
+    email: "priya.shah@smartlogix.com",
+    role: "super_admin",
+    status: "active",
+    lastActiveAt: "2026-08-25T13:10:00Z",
+    avatarUrl: "https://randomuser.me/api/portraits/women/65.jpg",
+  },
+  {
+    id: "au-02",
+    name: "Marcus Webb",
+    email: "marcus.webb@smartlogix.com",
+    role: "ops_manager",
+    status: "active",
+    lastActiveAt: "2026-08-25T12:40:00Z",
+    avatarUrl: "https://randomuser.me/api/portraits/men/41.jpg",
+  },
+  {
+    id: "au-03",
+    name: "Dana Okafor",
+    email: "dana.okafor@smartlogix.com",
+    role: "ops_manager",
+    status: "active",
+    lastActiveAt: "2026-08-24T17:55:00Z",
+    avatarUrl: "https://randomuser.me/api/portraits/women/21.jpg",
+  },
+  {
+    id: "au-04",
+    name: "Leo Fischer",
+    email: "leo.fischer@smartlogix.com",
+    role: "support",
+    status: "active",
+    lastActiveAt: "2026-08-25T11:05:00Z",
+    avatarUrl: "https://randomuser.me/api/portraits/men/12.jpg",
+  },
+  {
+    id: "au-05",
+    name: "Ines Duarte",
+    email: "ines.duarte@smartlogix.com",
+    role: "finance",
+    status: "active",
+    lastActiveAt: "2026-08-25T09:20:00Z",
+    avatarUrl: "https://randomuser.me/api/portraits/women/53.jpg",
+  },
+  {
+    id: "au-06",
+    name: "Jordan Pike",
+    email: "jordan.pike@smartlogix.com",
+    role: "support",
+    status: "invited",
+    lastActiveAt: "2026-08-20T00:00:00Z",
+  },
+];

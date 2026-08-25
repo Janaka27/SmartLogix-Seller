@@ -33,7 +33,7 @@ export default function Hero() {
             </p>
             <div className="mt-8 flex flex-wrap items-center gap-4">
               <a
-                href="#contact"
+                href="/seller/register"
                 className="rounded-full bg-orange-500 px-6 py-3.5 text-sm font-semibold text-white shadow-lg shadow-orange-500/25 transition hover:bg-orange-400"
               >
                 Become a Seller

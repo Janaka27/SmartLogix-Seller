@@ -67,7 +67,7 @@ export default function WhyChooseUs() {
               optimized routing so your orders move smarter, not slower.
             </p>
             <a
-              href="#contact"
+              href="/seller/register"
               className="mt-6 inline-flex items-center gap-2 rounded-full bg-orange-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-orange-400"
             >
               Get Started
