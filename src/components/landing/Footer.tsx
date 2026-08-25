@@ -1,3 +1,5 @@
+import Image from "next/image";
+
 const columns = [
   {
     heading: "Platform",
@@ -19,27 +21,14 @@ export default function Footer() {
       <div className="mx-auto max-w-7xl px-6 py-16 lg:px-8">
         <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-[1.2fr_repeat(3,1fr)]">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-900 text-white">
-                <svg viewBox="0 0 24 24" fill="none" className="h-5 w-5">
-                  <path
-                    d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Z"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M8.5 12.2 11 14.7l4.5-5"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </span>
-              <span className="text-lg font-bold tracking-tight text-slate-900">
-                SmartLogix
-              </span>
+            <div className="flex items-center">
+              <Image
+                src="/images/logo.png"
+                alt="SmartLogix"
+                width={911}
+                height={285}
+                className="h-8 w-auto"
+              />
             </div>
             <p className="mt-4 max-w-xs text-sm leading-relaxed text-slate-500">
               A smarter marketplace for sellers, powered by an optimized
