@@ -11,16 +11,14 @@ export function AuthShell({ role, children }: AuthShellProps) {
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-slate-950 px-4 py-12">
       <Link href="/" className="mb-8 flex items-center gap-2">
-        <span className="flex h-9 items-center rounded-lg bg-white px-3 shadow-sm">
-          <Image
-            src="/images/logo.png"
-            alt="SmartLogix"
-            width={911}
-            height={285}
-            priority
-            className="h-5 w-auto"
-          />
-        </span>
+        <Image
+          src="/images/logo-white-text.png"
+          alt="SmartLogix"
+          width={911}
+          height={285}
+          priority
+          className="h-9 w-auto"
+        />
         <span
           className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
             role === "seller" ? "bg-slate-800 text-white" : "bg-orange-500 text-white"

@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 
 const loginSchema = z.object({
@@ -51,7 +52,7 @@ export default function SellerLoginPage() {
         </div>
         <div className="space-y-1.5">
           <Label htmlFor="password">Password</Label>
-          <Input id="password" type="password" placeholder="••••••••" {...register("password")} />
+          <PasswordInput id="password" placeholder="••••••••" {...register("password")} />
           {errors.password && (
             <p className="text-xs text-destructive">{errors.password.message}</p>
           )}
