@@ -2,6 +2,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   LayoutDashboard,
   Warehouse,
+  Package,
   ClipboardList,
   Wallet,
   Store,
@@ -31,7 +32,7 @@ export const sellerNavGroups: NavGroup[] = [
     label: "Workspace",
     items: [
       { title: "Dashboard", href: "/seller", icon: LayoutDashboard },
-      { title: "Inventory", href: "/seller/inventory", icon: Warehouse },
+      { title: "Inventory", href: "/seller/inventory", icon: Package },
       { title: "Orders", href: "/seller/orders", icon: ClipboardList },
       { title: "Earnings", href: "/seller/earnings", icon: Wallet },
       { title: "Store Settings", href: "/seller/settings", icon: Store },

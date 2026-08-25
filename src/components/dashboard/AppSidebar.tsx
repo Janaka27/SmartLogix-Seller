@@ -24,6 +24,10 @@ interface AppSidebarProps {
   role: "seller" | "admin";
 }
 
+import { useEffect, useState } from "react";
+import { SellerService } from "@/server/services/seller.service";
+import { createClient } from "@/lib/supabase";
+
 const MOCK_USER = {
   seller: { name: "Jenna Torri", email: "jenna@torrihome.com", initials: "JT" },
   admin: { name: "Priya Shah", email: "priya.shah@smartlogix.com", initials: "PS" },
@@ -34,7 +38,27 @@ export function AppSidebar({ role }: AppSidebarProps) {
   const router = useRouter();
   const groups = role === "seller" ? sellerNavGroups : adminNavGroups;
   const badge = roleBadge[role];
-  const user = MOCK_USER[role];
+  const [user, setUser] = useState(MOCK_USER[role]);
+
+  useEffect(() => {
+    if (role === "seller") {
+      const fetchUser = async () => {
+        try {
+          const authUser = await SellerService.getUser();
+          if (authUser) {
+            const supabase = createClient();
+            const { data } = await supabase.from('profiles').select('full_name').eq('id', authUser.id).single();
+            const name = data?.full_name || authUser.email?.split('@')[0] || "Seller";
+            const initials = name.substring(0, 2).toUpperCase();
+            setUser({ name, email: authUser.email || "", initials });
+          }
+        } catch (e) {
+          console.error("Failed to fetch user profile", e);
+        }
+      };
+      fetchUser();
+    }
+  }, [role]);
 
   return (
     <Sidebar collapsible="icon">

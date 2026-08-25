@@ -10,19 +10,29 @@ import { CheckCircle2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { SellerService } from "@/server/services/seller.service";
 
-const registerSchema = z.object({
-  businessName: z.string().min(2, "Business name is required"),
-  ownerName: z.string().min(2, "Owner name is required"),
-  email: z.string().min(1, "Email is required").email("Enter a valid email address"),
-  phone: z.string().min(7, "Enter a valid phone number"),
-  storeDescription: z
-    .string()
-    .min(20, "Tell us a bit more (at least 20 characters)")
-    .max(400, "Keep it under 400 characters"),
-});
+const registerSchema = z
+  .object({
+    businessName: z.string().min(2, "Business name is required"),
+    ownerName: z.string().min(2, "Owner name is required"),
+    email: z.string().min(1, "Email is required").email("Enter a valid email address"),
+    phone: z.string().min(7, "Enter a valid phone number"),
+    password: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+    storeDescription: z
+      .string()
+      .min(20, "Tell us a bit more (at least 20 characters)")
+      .max(400, "Keep it under 400 characters"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords don't match",
+    path: ["confirmPassword"],
+  });
 
 type RegisterValues = z.infer<typeof registerSchema>;
 
@@ -40,16 +50,30 @@ export default function SellerRegisterPage() {
       ownerName: "",
       email: "",
       phone: "",
+      password: "",
+      confirmPassword: "",
       storeDescription: "",
     },
   });
 
   const onSubmit = async (values: RegisterValues) => {
-    void values;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setSubmitted(true);
+    try {
+      await SellerService.signUp(values.email, values.password, {
+        business_name: values.businessName,
+        owner_name: values.ownerName,
+        phone: values.phone,
+        store_description: values.storeDescription,
+      });
+      toast.success("Account created successfully!");
+      router.push("/seller/inventory");
+      // setSubmitted(true); // Uncomment this when you re-enable approval flow
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit application. Please try again.");
+    }
   };
 
+  /* 
+  // Uncomment this block later to restore the application review UI
   if (submitted) {
     return (
       <div className="text-center">
@@ -69,6 +93,7 @@ export default function SellerRegisterPage() {
       </div>
     );
   }
+  */
 
   return (
     <div>
@@ -102,6 +127,26 @@ export default function SellerRegisterPage() {
             <Label htmlFor="phone">Phone</Label>
             <Input id="phone" placeholder="512-555-0100" {...register("phone")} />
             {errors.phone && <p className="text-xs text-destructive">{errors.phone.message}</p>}
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-1.5">
+            <Label htmlFor="password">Password</Label>
+            <PasswordInput id="password" placeholder="••••••••" {...register("password")} />
+            {errors.password && (
+              <p className="text-xs text-destructive">{errors.password.message}</p>
+            )}
+          </div>
+          <div className="space-y-1.5">
+            <Label htmlFor="confirmPassword">Confirm password</Label>
+            <PasswordInput
+              id="confirmPassword"
+              placeholder="••••••••"
+              {...register("confirmPassword")}
+            />
+            {errors.confirmPassword && (
+              <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
+            )}
           </div>
         </div>
         <div className="space-y-1.5">

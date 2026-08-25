@@ -29,6 +29,10 @@ interface TopbarProps {
   role: "seller" | "admin";
 }
 
+import { useEffect, useState } from "react";
+import { SellerService } from "@/server/services/seller.service";
+import { createClient } from "@/lib/supabase";
+
 const SEGMENT_OVERRIDES: Record<string, string> = { cms: "CMS" };
 
 function titleCase(segment: string) {
@@ -43,6 +47,27 @@ export function Topbar({ role }: TopbarProps) {
   const router = useRouter();
   const rootLabel = role === "seller" ? "Seller Portal" : "Admin Panel";
   const rootHref = role === "seller" ? "/seller" : "/admin";
+
+  const [userInitials, setUserInitials] = useState(role === "seller" ? "JT" : "PS");
+
+  useEffect(() => {
+    if (role === "seller") {
+      const fetchUser = async () => {
+        try {
+          const authUser = await SellerService.getUser();
+          if (authUser) {
+            const supabase = createClient();
+            const { data } = await supabase.from('profiles').select('full_name').eq('id', authUser.id).single();
+            const name = data?.full_name || authUser.email?.split('@')[0] || "Seller";
+            setUserInitials(name.substring(0, 2).toUpperCase());
+          }
+        } catch (e) {
+          console.error("Failed to fetch user profile", e);
+        }
+      };
+      fetchUser();
+    }
+  }, [role]);
 
   const segments = pathname
     .replace(rootHref, "")
@@ -89,7 +114,7 @@ export function Topbar({ role }: TopbarProps) {
               <button className="flex items-center gap-2 rounded-full pl-1 pr-2 py-1 outline-none hover:bg-muted">
                 <Avatar className="h-7 w-7">
                   <AvatarFallback className="bg-slate-900 text-xs text-white">
-                    {role === "seller" ? "JT" : "PS"}
+                    {userInitials}
                   </AvatarFallback>
                 </Avatar>
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
