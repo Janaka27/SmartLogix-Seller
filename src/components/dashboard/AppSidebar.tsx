@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LogOut } from "lucide-react";
@@ -41,22 +42,14 @@ export function AppSidebar({ role }: AppSidebarProps) {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" render={<Link href={role === "seller" ? "/seller" : "/admin"} />}>
-              <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10 text-white ring-1 ring-white/20">
-                <svg viewBox="0 0 24 24" fill="none" className="h-4.5 w-4.5">
-                  <path
-                    d="M12 2 3 7v6c0 5 4 8 9 9 5-1 9-4 9-9V7l-9-5Z"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M8.5 12.2 11 14.7l4.5-5"
-                    stroke="currentColor"
-                    strokeWidth="1.6"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white p-1.5">
+                <Image
+                  src="/images/logo-mark.png"
+                  alt=""
+                  width={191}
+                  height={259}
+                  className="h-full w-auto"
+                />
               </span>
               <div className="flex flex-1 flex-col leading-tight">
                 <span className="text-sm font-semibold text-white">SmartLogix</span>
