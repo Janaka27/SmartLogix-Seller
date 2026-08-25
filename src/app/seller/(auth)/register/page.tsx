@@ -13,6 +13,8 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { SellerService } from "@/server/services/seller.service";
 
 const registerSchema = z
   .object({
@@ -55,11 +57,23 @@ export default function SellerRegisterPage() {
   });
 
   const onSubmit = async (values: RegisterValues) => {
-    void values;
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setSubmitted(true);
+    try {
+      await SellerService.signUp(values.email, values.password, {
+        business_name: values.businessName,
+        owner_name: values.ownerName,
+        phone: values.phone,
+        store_description: values.storeDescription,
+      });
+      toast.success("Account created successfully!");
+      router.push("/seller/inventory");
+      // setSubmitted(true); // Uncomment this when you re-enable approval flow
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit application. Please try again.");
+    }
   };
 
+  /* 
+  // Uncomment this block later to restore the application review UI
   if (submitted) {
     return (
       <div className="text-center">
@@ -79,6 +93,7 @@ export default function SellerRegisterPage() {
       </div>
     );
   }
+  */
 
   return (
     <div>

@@ -31,33 +31,50 @@ import { products as seedProducts, inventoryRecords, warehouses } from "@/lib/mo
 import { formatCurrency, formatWeight } from "@/lib/format";
 import type { Product, ProductStatus } from "@/lib/types";
 import { ProductService } from "@/server/services/product.service";
-
-// Note: These need to be actual UUIDs from your 'profiles' and 'warehouses' tables.
-// Using valid UUID formats here to prevent Postgres type errors.
-const CURRENT_SELLER_ID = "11111111-1111-1111-1111-111111111111";
-const DEFAULT_WAREHOUSE_ID = "22222222-2222-2222-2222-222222222222";
+import { SellerService } from "@/server/services/seller.service";
+import { createClient } from "@/lib/supabase";
+import { useRouter } from "next/navigation";
 
 export default function SellerInventoryPage() {
+  const router = useRouter();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
 
+  const [sellerId, setSellerId] = useState<string | null>(null);
+  const [warehouseId, setWarehouseId] = useState<string | null>(null);
+
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchUserAndProducts = async () => {
       try {
-        const data = await ProductService.getProducts(CURRENT_SELLER_ID);
-        // Supabase column names might be snake_case depending on schema, but assuming they match Product type
+        const user = await SellerService.getUser();
+        if (!user) {
+          router.push("/seller/login");
+          return;
+        }
+        setSellerId(user.id);
+
+        // Fetch a valid warehouse from the DB (using the first available for now)
+        const supabase = createClient();
+        const { data: whData } = await supabase.from('warehouses').select('id').limit(1).single();
+        const resolvedWarehouseId = whData?.id;
+        setWarehouseId(resolvedWarehouseId);
+
+        console.log("Logged in Seller ID:", user.id);
+        console.log("Selected Warehouse ID:", resolvedWarehouseId);
+
+        const data = await ProductService.getProducts(user.id);
         setProducts(data as unknown as Product[]);
       } catch (err) {
-        console.error("Failed to load products", err);
+        console.error("Failed to load products or user", err);
       } finally {
         setLoading(false);
       }
     };
-    fetchProducts();
-  }, []);
+    fetchUserAndProducts();
+  }, [router]);
 
   const [productSearch, setProductSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProductStatus | "all">("all");
@@ -135,8 +152,8 @@ export default function SellerInventoryPage() {
         const newProduct = await ProductService.createProduct({
           ...values,
           volumeCm3,
-          sellerId: CURRENT_SELLER_ID,
-          warehouseId: DEFAULT_WAREHOUSE_ID,
+          sellerId: sellerId!,
+          warehouseId: warehouseId!,
         });
         setProducts((prev) => [newProduct as unknown as Product, ...prev]);
       }
@@ -154,7 +171,7 @@ export default function SellerInventoryPage() {
   };
 
   const warehouseName =
-    warehouses.find((w) => w.id === (editing?.warehouseId ?? DEFAULT_WAREHOUSE_ID))?.name ??
+    warehouses.find((w) => w.id === (editing?.warehouseId ?? warehouseId))?.name ??
     "your warehouse";
 
   return (
