@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Package, Pencil, Plus, Boxes, Warehouse as WarehouseIcon } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -30,17 +30,34 @@ import { BulkStockDialog } from "@/components/seller/BulkStockDialog";
 import { products as seedProducts, inventoryRecords, warehouses } from "@/lib/mock-data";
 import { formatCurrency, formatWeight } from "@/lib/format";
 import type { Product, ProductStatus } from "@/lib/types";
+import { ProductService } from "@/server/services/product.service";
 
-const CURRENT_SELLER_ID = "sl-01";
-const DEFAULT_WAREHOUSE_ID = "wh-01";
+// Note: These need to be actual UUIDs from your 'profiles' and 'warehouses' tables.
+// Using valid UUID formats here to prevent Postgres type errors.
+const CURRENT_SELLER_ID = "11111111-1111-1111-1111-111111111111";
+const DEFAULT_WAREHOUSE_ID = "22222222-2222-2222-2222-222222222222";
 
 export default function SellerInventoryPage() {
-  const [products, setProducts] = useState<Product[]>(
-    seedProducts.filter((p) => p.sellerId === CURRENT_SELLER_ID)
-  );
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
+
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const data = await ProductService.getProducts(CURRENT_SELLER_ID);
+        // Supabase column names might be snake_case depending on schema, but assuming they match Product type
+        setProducts(data as unknown as Product[]);
+      } catch (err) {
+        console.error("Failed to load products", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchProducts();
+  }, []);
 
   const [productSearch, setProductSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProductStatus | "all">("all");
@@ -90,7 +107,7 @@ export default function SellerInventoryPage() {
     setDialogOpen(true);
   };
 
-  const handleSave = (values: {
+  const handleSave = async (values: {
     name: string;
     description: string;
     category: string;
@@ -105,21 +122,28 @@ export default function SellerInventoryPage() {
   }) => {
     const volumeCm3 = values.lengthCm * values.widthCm * values.heightCm;
 
-    if (editing) {
-      setProducts((prev) =>
-        prev.map((p) => (p.id === editing.id ? { ...p, ...values, volumeCm3 } : p))
-      );
-    } else {
-      const newProduct: Product = {
-        id: `pd-${Math.random().toString(36).slice(2, 8)}`,
-        sellerId: CURRENT_SELLER_ID,
-        warehouseId: DEFAULT_WAREHOUSE_ID,
-        images: [],
-        createdAt: new Date().toISOString(),
-        volumeCm3,
-        ...values,
-      };
-      setProducts((prev) => [newProduct, ...prev]);
+    try {
+      if (editing) {
+        const updated = await ProductService.updateProduct(editing.id, {
+          ...values,
+          volumeCm3,
+        });
+        setProducts((prev) =>
+          prev.map((p) => (p.id === editing.id ? { ...p, ...updated } : p))
+        );
+      } else {
+        const newProduct = await ProductService.createProduct({
+          ...values,
+          volumeCm3,
+          sellerId: CURRENT_SELLER_ID,
+          warehouseId: DEFAULT_WAREHOUSE_ID,
+        });
+        setProducts((prev) => [newProduct as unknown as Product, ...prev]);
+      }
+      setDialogOpen(false);
+    } catch (err) {
+      console.error("Failed to save product", err);
+      alert("Failed to save product. Check the console for details.");
     }
   };
 
