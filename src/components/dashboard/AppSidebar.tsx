@@ -17,7 +17,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { sellerNavGroups, adminNavGroups, roleBadge } from "@/lib/nav-config";
 
 interface AppSidebarProps {
@@ -30,8 +30,8 @@ import { AdminService } from "@/server/services/admin.service";
 import { createClient } from "@/lib/supabase";
 
 const MOCK_USER = {
-  seller: { name: "Jenna Torri", email: "jenna@torrihome.com", initials: "JT" },
-  admin: { name: "Priya Shah", email: "priya.shah@smartlogix.com", initials: "PS" },
+  seller: { name: "Jenna Torri", email: "jenna@torrihome.com", initials: "JT", avatarUrl: undefined as string | undefined },
+  admin: { name: "Priya Shah", email: "priya.shah@smartlogix.com", initials: "PS", avatarUrl: undefined as string | undefined },
 };
 
 export function AppSidebar({ role }: AppSidebarProps) {
@@ -48,11 +48,11 @@ export function AppSidebar({ role }: AppSidebarProps) {
         const authUser = await service.getUser();
         if (authUser) {
           const supabase = createClient();
-          const { data } = await supabase.from('profiles').select('full_name').eq('id', authUser.id).single();
+          const { data } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', authUser.id).single();
           const defaultName = role === "seller" ? "Seller" : "Admin";
           const name = data?.full_name || authUser.email?.split('@')[0] || defaultName;
           const initials = name.substring(0, 2).toUpperCase();
-          setUser({ name, email: authUser.email || "", initials });
+          setUser({ name, email: authUser.email || "", initials, avatarUrl: data?.avatar_url || undefined });
         }
       } catch (e) {
         console.error("Failed to fetch user profile", e);
@@ -122,6 +122,7 @@ export function AppSidebar({ role }: AppSidebarProps) {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" className="cursor-default hover:bg-transparent">
               <Avatar className="h-7 w-7">
+                {user.avatarUrl && <AvatarImage src={user.avatarUrl} alt={user.name} />}
                 <AvatarFallback className="bg-sidebar-accent text-xs text-white">
                   {user.initials}
                 </AvatarFallback>

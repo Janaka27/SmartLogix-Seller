@@ -126,6 +126,83 @@ export const SellerService = {
     return data;
   },
 
+  // Seller-facing: their own store profile + owner contact info, shaped for
+  // the Store Settings form (Settings page).
+  async getMySettings(userId: string) {
+    const { data, error } = await supabase
+      .from('seller_profiles')
+      .select(`
+        store_name,
+        description,
+        payout_details,
+        profile:profiles!seller_profiles_profile_id_fkey (
+          full_name,
+          email,
+          phone,
+          avatar_url
+        )
+      `)
+      .eq('profile_id', userId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching store settings:', error.message);
+      throw new Error(error.message);
+    }
+
+    const row = data as unknown as {
+      store_name: string;
+      description: string | null;
+      payout_details: { method?: string; last4?: string } | null;
+      profile: { full_name: string | null; email: string | null; phone: string | null; avatar_url: string | null } | null;
+    };
+
+    return {
+      businessName: row.store_name,
+      ownerName: row.profile?.full_name ?? '',
+      email: row.profile?.email ?? '',
+      phone: row.profile?.phone ?? '',
+      storeDescription: row.description ?? '',
+      logoUrl: row.profile?.avatar_url ?? null,
+      payoutMethod: row.payout_details?.method
+        ? `${row.payout_details.method}${row.payout_details.last4 ? ` •••• ${row.payout_details.last4}` : ''}`
+        : 'Not configured',
+    };
+  },
+
+  // Seller-facing: save Store Settings changes. Login email is intentionally
+  // left out — changing it goes through Supabase auth's own confirmation flow.
+  async updateMySettings(
+    userId: string,
+    updates: {
+      businessName: string;
+      ownerName: string;
+      phone: string;
+      storeDescription: string;
+      logoUrl?: string | null;
+    }
+  ) {
+    const profileUpdate: Record<string, unknown> = { full_name: updates.ownerName, phone: updates.phone };
+    if (updates.logoUrl !== undefined) profileUpdate.avatar_url = updates.logoUrl;
+
+    const [{ error: profileError }, { error: sellerError }] = await Promise.all([
+      supabase.from('profiles').update(profileUpdate).eq('id', userId),
+      supabase
+        .from('seller_profiles')
+        .update({ store_name: updates.businessName, description: updates.storeDescription })
+        .eq('profile_id', userId),
+    ]);
+
+    if (profileError) {
+      console.error('Error updating profile:', profileError.message);
+      throw new Error(profileError.message);
+    }
+    if (sellerError) {
+      console.error('Error updating seller profile:', sellerError.message);
+      throw new Error(sellerError.message);
+    }
+  },
+
   // Admin-only: every seller across the platform, with owner contact info
   // and how many warehouses each one has.
   async getAllSellers(): Promise<Seller[]> {
