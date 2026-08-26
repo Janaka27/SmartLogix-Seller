@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
+import { AdminService } from "@/server/services/admin.service";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Enter a valid email address"),
@@ -30,10 +31,13 @@ export default function AdminLoginPage() {
   });
 
   const onSubmit = async (values: LoginValues) => {
-    void values;
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    toast.success("Welcome back!");
-    router.push("/admin");
+    try {
+      await AdminService.login(values.email, values.password);
+      toast.success("Welcome back!");
+      router.push("/admin");
+    } catch (error: any) {
+      toast.error(error.message || "Failed to sign in. Please check your credentials.");
+    }
   };
 
   return (

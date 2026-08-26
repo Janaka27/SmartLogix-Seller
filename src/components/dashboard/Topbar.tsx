@@ -31,6 +31,7 @@ interface TopbarProps {
 
 import { useEffect, useState } from "react";
 import { SellerService } from "@/server/services/seller.service";
+import { AdminService } from "@/server/services/admin.service";
 import { createClient } from "@/lib/supabase";
 
 const SEGMENT_OVERRIDES: Record<string, string> = { cms: "CMS" };
@@ -51,22 +52,22 @@ export function Topbar({ role }: TopbarProps) {
   const [userInitials, setUserInitials] = useState(role === "seller" ? "JT" : "PS");
 
   useEffect(() => {
-    if (role === "seller") {
-      const fetchUser = async () => {
-        try {
-          const authUser = await SellerService.getUser();
-          if (authUser) {
-            const supabase = createClient();
-            const { data } = await supabase.from('profiles').select('full_name').eq('id', authUser.id).single();
-            const name = data?.full_name || authUser.email?.split('@')[0] || "Seller";
-            setUserInitials(name.substring(0, 2).toUpperCase());
-          }
-        } catch (e) {
-          console.error("Failed to fetch user profile", e);
+    const fetchUser = async () => {
+      try {
+        const service = role === "seller" ? SellerService : AdminService;
+        const authUser = await service.getUser();
+        if (authUser) {
+          const supabase = createClient();
+          const { data } = await supabase.from('profiles').select('full_name').eq('id', authUser.id).single();
+          const defaultName = role === "seller" ? "Seller" : "Admin";
+          const name = data?.full_name || authUser.email?.split('@')[0] || defaultName;
+          setUserInitials(name.substring(0, 2).toUpperCase());
         }
-      };
-      fetchUser();
-    }
+      } catch (e) {
+        console.error("Failed to fetch user profile", e);
+      }
+    };
+    fetchUser();
   }, [role]);
 
   const segments = pathname
@@ -132,7 +133,15 @@ export function Topbar({ role }: TopbarProps) {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => router.push(role === "seller" ? "/seller/login" : "/admin/login")}
+              onClick={async () => {
+                try {
+                  const service = role === "seller" ? SellerService : AdminService;
+                  await service.logout();
+                } catch (e) {
+                  console.error("Failed to log out:", e);
+                }
+                router.push(role === "seller" ? "/seller/login" : "/admin/login");
+              }}
             >
               <LogOut /> Log out
             </DropdownMenuItem>
