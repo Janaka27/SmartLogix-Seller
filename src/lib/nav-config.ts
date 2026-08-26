@@ -34,6 +34,7 @@ export const sellerNavGroups: NavGroup[] = [
       { title: "Dashboard", href: "/seller", icon: LayoutDashboard },
       { title: "Inventory", href: "/seller/inventory", icon: Package },
       { title: "Orders", href: "/seller/orders", icon: ClipboardList },
+      { title: "Drone Fleet", href: "/seller/drones", icon: DroneIcon },
       { title: "Earnings", href: "/seller/earnings", icon: Wallet },
       { title: "Store Settings", href: "/seller/settings", icon: Store },
     ],

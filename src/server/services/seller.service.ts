@@ -100,12 +100,14 @@ export const SellerService = {
 
   async getUser() {
     const { data, error } = await supabase.auth.getUser();
-    
+
     if (error) {
+      // No active session is a normal, expected state — not a failure.
+      if (error.name === 'AuthSessionMissingError') return null;
       console.error('Error getting user:', error.message);
       throw new Error(error.message);
     }
-    
+
     return data.user;
   },
 

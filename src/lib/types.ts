@@ -82,6 +82,24 @@ export interface Drone {
   currentLng: number;
 }
 
+export type DroneRequestStatus = "pending" | "approved" | "rejected" | "fulfilled" | "cancelled";
+export type DroneRequestUrgency = "low" | "normal" | "high";
+
+// A seller's ask for drones beyond their standard 5-drone fleet allotment.
+export interface DroneRequest {
+  id: string;
+  sellerId: string;
+  warehouseId: string | null;
+  requestedQuantity: number;
+  reason: string;
+  urgency: DroneRequestUrgency;
+  status: DroneRequestStatus;
+  adminNotes?: string;
+  createdAt: string;
+  updatedAt: string;
+  reviewedAt?: string;
+}
+
 export type AssignmentStatus = "queued" | "in_flight" | "delivered" | "cancelled";
 
 export interface DroneAssignment {

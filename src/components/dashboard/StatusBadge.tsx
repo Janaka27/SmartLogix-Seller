@@ -32,6 +32,8 @@ const STATUS_STYLES: Record<string, string> = {
   // payouts
   processing: "bg-amber-50 text-amber-700",
   paid: "bg-emerald-50 text-emerald-700",
+  // drone requests
+  fulfilled: "bg-emerald-100 text-emerald-800",
 };
 
 function toLabel(status: string) {

@@ -1,15 +1,22 @@
 "use client";
 
-import { useState } from "react";
-import { Users, Plus, MoreHorizontal, Ban, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Users } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/PageHeader";
-import { StatusBadge } from "@/components/dashboard/StatusBadge";
+import { DataTableToolbar } from "@/components/dashboard/DataTableToolbar";
 import { EmptyState } from "@/components/dashboard/EmptyState";
-import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -18,22 +25,31 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { InviteUserDialog } from "@/components/admin/InviteUserDialog";
-import { adminUsers as seedUsers } from "@/lib/mock-data";
-import { formatDateTime } from "@/lib/format";
-import type { AdminRole, AdminUser } from "@/lib/types";
+import { AdminService } from "@/server/services/admin.service";
+import { formatDate } from "@/lib/format";
 
-const ROLE_LABELS: Record<AdminRole, string> = {
-  super_admin: "Super Admin",
-  ops_manager: "Ops Manager",
-  support: "Support",
-  finance: "Finance",
+type PlatformRole = "buyer" | "seller" | "admin";
+
+interface PlatformUser {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  role: PlatformRole;
+  avatarUrl?: string;
+  joinedAt: string;
+}
+
+const ROLE_LABELS: Record<PlatformRole, string> = {
+  admin: "Admin",
+  seller: "Seller",
+  buyer: "Buyer",
+};
+
+const ROLE_BADGE_CLASSES: Record<PlatformRole, string> = {
+  admin: "bg-blue-50 text-blue-700",
+  seller: "bg-orange-50 text-orange-700",
+  buyer: "bg-slate-100 text-slate-700",
 };
 
 function initials(name: string) {
@@ -46,41 +62,62 @@ function initials(name: string) {
 }
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<AdminUser[]>(seedUsers);
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const [users, setUsers] = useState<PlatformUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState<PlatformRole | "all">("all");
 
-  const handleInvite = (values: { name: string; email: string; role: AdminRole }) => {
-    setUsers((prev) => [
-      {
-        id: `au-${Math.random().toString(36).slice(2, 8)}`,
-        status: "invited",
-        lastActiveAt: new Date().toISOString(),
-        ...values,
-      },
-      ...prev,
-    ]);
-  };
+  useEffect(() => {
+    AdminService.getAllUsers()
+      .then((data) => setUsers(data as PlatformUser[]))
+      .catch((err) => {
+        console.error("Failed to load users", err);
+        toast.error("Failed to load users");
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
-  const toggleStatus = (user: AdminUser) => {
-    const next = user.status === "disabled" ? "active" : "disabled";
-    setUsers((prev) => prev.map((u) => (u.id === user.id ? { ...u, status: next } : u)));
-    toast.success(`${user.name} ${next}`);
-  };
+  const filtered = useMemo(() => {
+    return users.filter((u) => {
+      const matchesSearch =
+        u.name.toLowerCase().includes(search.toLowerCase()) ||
+        u.email.toLowerCase().includes(search.toLowerCase());
+      const matchesRole = roleFilter === "all" || u.role === roleFilter;
+      return matchesSearch && matchesRole;
+    });
+  }, [users, search, roleFilter]);
 
   return (
     <div>
-      <PageHeader
-        title="Users & Roles"
-        description="Manage admin and operations staff access."
-        actions={
-          <Button onClick={() => setDialogOpen(true)}>
-            <Plus /> Invite User
-          </Button>
+      <PageHeader title="Users" description="Everyone registered on the SmartLogix platform." />
+
+      <DataTableToolbar
+        searchValue={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search users..."
+        filters={
+          <Select value={roleFilter} onValueChange={(v) => setRoleFilter((v ?? "all") as typeof roleFilter)}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="Role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All roles</SelectItem>
+              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="seller">Seller</SelectItem>
+              <SelectItem value="buyer">Buyer</SelectItem>
+            </SelectContent>
+          </Select>
         }
       />
 
-      {users.length === 0 ? (
-        <EmptyState icon={Users} title="No users yet" />
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState icon={Users} title="No users found" />
       ) : (
         <div className="rounded-xl border border-border">
           <Table>
@@ -88,13 +125,12 @@ export default function AdminUsersPage() {
               <TableRow>
                 <TableHead>User</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Last Active</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
+                <TableHead>Phone</TableHead>
+                <TableHead>Joined</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {users.map((user) => (
+              {filtered.map((user) => (
                 <TableRow key={user.id}>
                   <TableCell>
                     <div className="flex items-center gap-2.5">
@@ -111,46 +147,18 @@ export default function AdminUsersPage() {
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge variant="secondary" className="border-0 bg-slate-100 text-slate-700">
+                    <Badge variant="secondary" className={`border-0 ${ROLE_BADGE_CLASSES[user.role]}`}>
                       {ROLE_LABELS[user.role]}
                     </Badge>
                   </TableCell>
-                  <TableCell>
-                    <StatusBadge status={user.status} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDateTime(user.lastActiveAt)}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <Button variant="ghost" size="icon-sm">
-                            <MoreHorizontal />
-                          </Button>
-                        }
-                      />
-                      <DropdownMenuContent align="end">
-                        {user.status === "disabled" ? (
-                          <DropdownMenuItem onClick={() => toggleStatus(user)}>
-                            <RotateCcw /> Reactivate
-                          </DropdownMenuItem>
-                        ) : (
-                          <DropdownMenuItem variant="destructive" onClick={() => toggleStatus(user)}>
-                            <Ban /> Disable
-                          </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
+                  <TableCell className="text-muted-foreground">{user.phone || "—"}</TableCell>
+                  <TableCell className="text-muted-foreground">{formatDate(user.joinedAt)}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
       )}
-
-      <InviteUserDialog open={dialogOpen} onOpenChange={setDialogOpen} onInvite={handleInvite} />
     </div>
   );
 }
