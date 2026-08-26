@@ -75,5 +75,34 @@ export const AdminService = {
       throw new Error(body.error || 'Failed to fetch users');
     }
     return response.json();
+  },
+
+  // Get all drone requests via server route to bypass RLS
+  async getAllDroneRequests() {
+    const response = await fetch('/api/admin/drone-requests/show');
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'Failed to fetch drone requests');
+    }
+    return response.json();
+  },
+
+  async updateDroneRequestStatus(requestId: string, status: string, adminNotes: string) {
+    const response = await fetch('/api/admin/drone-requests/update', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requestId,
+        status,
+        adminNotes,
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'Failed to update drone request');
+    }
+    return response.json();
   }
 };
