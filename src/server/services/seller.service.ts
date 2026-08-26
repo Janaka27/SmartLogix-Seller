@@ -1,6 +1,24 @@
 import { createClient } from '@/lib/supabase';
+import type { Seller, SellerStatus } from '@/lib/types';
 
 const supabase = createClient();
+
+interface SellerProfileRow {
+  profile_id: string;
+  store_name: string;
+  description: string | null;
+  status: SellerStatus;
+  payout_details: { method?: string } | null;
+  created_at: string;
+  updated_at: string;
+  profile: {
+    id: string;
+    full_name: string | null;
+    email: string | null;
+    phone: string | null;
+    warehouses: { id: string }[] | null;
+  } | null;
+}
 
 export const SellerService = {
 
@@ -100,6 +118,67 @@ export const SellerService = {
 
     if (error) {
       console.error('Error fetching seller profile:', error.message);
+      throw new Error(error.message);
+    }
+
+    return data;
+  },
+
+  // Admin-only: every seller across the platform, with owner contact info
+  // and how many warehouses each one has.
+  async getAllSellers(): Promise<Seller[]> {
+    const { data, error } = await supabase
+      .from('seller_profiles')
+      .select(`
+        id,
+        profile_id,
+        store_name,
+        description,
+        status,
+        payout_details,
+        created_at,
+        updated_at,
+        profile:profiles!seller_profiles_profile_id_fkey (
+          id,
+          full_name,
+          email,
+          phone,
+          warehouses:warehouses!warehouses_seller_id_fkey ( id )
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error fetching sellers:', error.message);
+      throw new Error(error.message);
+    }
+
+    return ((data || []) as unknown as SellerProfileRow[]).map((row) => ({
+      id: row.profile?.id ?? row.profile_id,
+      businessName: row.store_name,
+      ownerName: row.profile?.full_name ?? '',
+      email: row.profile?.email ?? '',
+      phone: row.profile?.phone ?? '',
+      status: row.status,
+      appliedAt: row.created_at,
+      approvedAt: row.status === 'approved' ? row.updated_at : undefined,
+      warehouseIds: (row.profile?.warehouses ?? []).map((w) => w.id),
+      payoutMethod: row.payout_details?.method ?? 'Not configured',
+      storeDescription: row.description ?? '',
+    })) as unknown as Seller[];
+  },
+
+  // Admin-only: approve / reject / suspend / reinstate a seller.
+  async updateSellerStatus(sellerId: string, status: SellerStatus) {
+    const { data, error } = await supabase
+      .from('seller_profiles')
+      .update({ status })
+      .eq('profile_id', sellerId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating seller status:', error.message);
       throw new Error(error.message);
     }
 
