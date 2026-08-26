@@ -111,6 +111,7 @@ export const DroneService = {
       console.error('Error submitting drone request:', error.message);
       throw new Error(error.message);
     }
+    
     return mapDroneRequest(data);
   },
 
