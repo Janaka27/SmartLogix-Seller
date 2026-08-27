@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { DroneFormDialog } from "@/components/admin/DroneFormDialog";
 import { drones as seedDrones, warehouses } from "@/lib/mock-data";
-import { AdminService } from "@/server/services/admin.service";
+import { AdminService, isUnauthorizedError } from "@/server/services/admin.service";
 import { formatDateTime } from "@/lib/format";
 import type { Drone, DroneRequest, DroneStatus } from "@/lib/types";
 
@@ -63,7 +63,11 @@ export default function AdminDronesPage() {
       })) as DroneRequest[];
       setRequests(mappedReqs);
     } catch (err) {
-      console.error("Failed to load requests:", err);
+      // Nothing gates this page by role yet, so a non-admin session lands
+      // here too and gets a 401 — expected, not worth logging as an error.
+      if (!isUnauthorizedError(err)) {
+        console.error("Failed to load requests:", err);
+      }
     }
   };
 

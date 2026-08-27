@@ -24,6 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { AdminNotificationBell } from "@/components/admin/AdminNotificationBell";
 
 interface TopbarProps {
   role: "seller" | "admin";
@@ -106,9 +107,13 @@ export function Topbar({ role }: TopbarProps) {
         <span className="hidden rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline-block">
           Demo mode — changes aren&apos;t saved
         </span>
-        <Button variant="ghost" size="icon-sm" aria-label="Notifications">
-          <Bell />
-        </Button>
+        {role === "admin" ? (
+          <AdminNotificationBell />
+        ) : (
+          <Button variant="ghost" size="icon-sm" aria-label="Notifications">
+            <Bell />
+          </Button>
+        )}
         <DropdownMenu>
           <DropdownMenuTrigger
             render={

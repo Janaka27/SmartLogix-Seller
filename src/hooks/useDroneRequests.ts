@@ -3,8 +3,8 @@
 import { useEffect } from "react";
 import { createClient } from "@/lib/supabase";
 
-export function useDroneRequests(
-    onNewRequest: (request: any) => void
+export function useDroneRequests<T = Record<string, unknown>>(
+    onNewRequest: (request: T) => void
 ) {
 
     useEffect(() => {
@@ -25,7 +25,7 @@ export function useDroneRequests(
                         "New drone request:",
                         payload.new
                     );
-                    onNewRequest(payload.new);
+                    onNewRequest(payload.new as T);
                 }
             )
             .subscribe();
