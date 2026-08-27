@@ -28,7 +28,7 @@ import { warehouses } from "@/lib/mock-data";
 import type { Drone } from "@/lib/types";
 
 const droneSchema = z.object({
-  droneCode: z.string().min(2, "Drone code is required"),
+  droneCode: z.string().min(2, "Drone code is required").startsWith("DRN", "Drone code must start with DRN"),
   model: z.string().min(2, "Model is required"),
   maxPayloadKg: z.coerce.number().positive("Must be greater than 0"),
   cargoBayLengthCm: z.coerce.number().positive("Must be greater than 0"),
@@ -49,7 +49,7 @@ interface DroneFormDialogProps {
 }
 
 const EMPTY_VALUES: DroneFormValues = {
-  droneCode: "",
+  droneCode: "DRN- ",
   model: "Falcon X2",
   maxPayloadKg: 85,
   cargoBayLengthCm: 60,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Package, Pencil, Plus, Boxes, Settings, Warehouse as WarehouseIcon } from "lucide-react";
+import { Package, Pencil, Plus, Boxes, Warehouse as WarehouseIcon } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
@@ -84,9 +84,10 @@ export default function SellerInventoryPage() {
   const [previewProduct, setPreviewProduct] = useState<Product | null>(null);
 
   const [sellerId, setSellerId] = useState<string | null>(null);
-  const [sellerWarehouse, setSellerWarehouse] = useState<SellerWarehouse | null>(null);
+  const [sellerWarehouses, setSellerWarehouses] = useState<SellerWarehouse[]>([]);
   const [warehouseDialogOpen, setWarehouseDialogOpen] = useState(false);
-  const warehouseId = sellerWarehouse?.id ?? null;
+  const [editingWarehouse, setEditingWarehouse] = useState<SellerWarehouse | null>(null);
+  const hasWarehouse = sellerWarehouses.length > 0;
 
   useEffect(() => {
     const fetchUserAndProducts = async () => {
@@ -98,15 +99,15 @@ export default function SellerInventoryPage() {
         }
         setSellerId(user.id);
 
-        const warehouse = await WarehouseService.getBySeller(user.id);
-        if (!warehouse) {
+        const warehouses = await WarehouseService.getAllBySeller(user.id);
+        if (warehouses.length === 0) {
           // A seller must have a warehouse before they can add products —
           // the Inventory page shows an inline setup card for this instead
           // of routing away or popping a modal on load.
           setLoading(false);
           return;
         }
-        setSellerWarehouse(warehouse);
+        setSellerWarehouses(warehouses);
 
         const data = await ProductService.getProducts(user.id);
         setProducts(data as unknown as Product[]);
@@ -119,26 +120,41 @@ export default function SellerInventoryPage() {
     fetchUserAndProducts();
   }, [router]);
 
+  const openAddWarehouse = () => {
+    setEditingWarehouse(null);
+    setWarehouseDialogOpen(true);
+  };
+
+  const openEditWarehouse = (warehouse: SellerWarehouse) => {
+    setEditingWarehouse(warehouse);
+    setWarehouseDialogOpen(true);
+  };
+
   const handleWarehouseSave = async (values: WarehouseFormValues) => {
     if (!sellerId) return;
 
-    if (sellerWarehouse) {
-      const updated = await WarehouseService.update(sellerWarehouse.id, values);
-      setSellerWarehouse(updated);
+    if (editingWarehouse) {
+      const updated = await WarehouseService.update(editingWarehouse.id, values);
+      setSellerWarehouses((prev) =>
+        prev.map((w) => (w.id === editingWarehouse.id ? updated : w))
+      );
       return;
     }
 
     const created = await WarehouseService.create({ ...values, sellerId });
-    setSellerWarehouse(created);
+    setSellerWarehouses((prev) => [...prev, created]);
 
-    const data = await ProductService.getProducts(sellerId);
-    setProducts(data as unknown as Product[]);
+    if (products.length === 0) {
+      const data = await ProductService.getProducts(sellerId);
+      setProducts(data as unknown as Product[]);
+    }
   };
 
   const [productSearch, setProductSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<ProductStatus | "all">("all");
 
   const [warehouseSearch, setWarehouseSearch] = useState("");
+  const [warehouseFilter, setWarehouseFilter] = useState<string>("all");
 
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
@@ -148,17 +164,26 @@ export default function SellerInventoryPage() {
     });
   }, [products, productSearch, statusFilter]);
 
-  // Sellers have a single warehouse today, so every product in `products`
-  // already lives there — this tab is that warehouse's stock breakdown.
   const warehouseProducts = useMemo(
-    () => products.filter((p) => p.name.toLowerCase().includes(warehouseSearch.toLowerCase())),
-    [products, warehouseSearch]
+    () =>
+      products.filter((p) => {
+        const matchesSearch = p.name.toLowerCase().includes(warehouseSearch.toLowerCase());
+        const matchesWarehouse = warehouseFilter === "all" || p.warehouseId === warehouseFilter;
+        return matchesSearch && matchesWarehouse;
+      }),
+    [products, warehouseSearch, warehouseFilter]
   );
 
-  const totalStock = useMemo(
-    () => products.reduce((sum, p) => sum + p.stockQty, 0),
-    [products]
-  );
+  const stockByWarehouse = useMemo(() => {
+    const map = new Map<string, { productCount: number; totalStock: number }>();
+    for (const p of products) {
+      const entry = map.get(p.warehouseId) ?? { productCount: 0, totalStock: 0 };
+      entry.productCount += 1;
+      entry.totalStock += p.stockQty;
+      map.set(p.warehouseId, entry);
+    }
+    return map;
+  }, [products]);
 
   const openAdd = () => {
     setEditing(null);
@@ -187,7 +212,6 @@ export default function SellerInventoryPage() {
           ...values,
           volumeCm3,
           sellerId: sellerId!,
-          warehouseId: warehouseId!,
         });
         setProducts((prev) => [newProduct as unknown as Product, ...prev]);
       }
@@ -204,8 +228,6 @@ export default function SellerInventoryPage() {
     );
   };
 
-  const warehouseName = sellerWarehouse?.name ?? "your warehouse";
-
   return (
     <div>
       <PageHeader
@@ -213,14 +235,14 @@ export default function SellerInventoryPage() {
         description={
           loading
             ? "Loading your inventory…"
-            : sellerWarehouse
+            : hasWarehouse
               ? "Manage your product catalog and see how stock is distributed across warehouses."
               : "Set up your warehouse to start listing products."
         }
         actions={
-          sellerWarehouse && (
-            <Button variant="outline" onClick={() => setWarehouseDialogOpen(true)}>
-              <Settings /> Warehouse settings
+          hasWarehouse && (
+            <Button onClick={openAddWarehouse}>
+              <Plus /> Add Warehouse
             </Button>
           )
         }
@@ -228,7 +250,7 @@ export default function SellerInventoryPage() {
 
       {loading ? (
         <InventoryTableSkeleton />
-      ) : !sellerWarehouse ? (
+      ) : !hasWarehouse ? (
         <WarehouseSetupCard onSave={handleWarehouseSave} />
       ) : (
       <Tabs defaultValue="products">
@@ -293,6 +315,7 @@ export default function SellerInventoryPage() {
                   <TableRow>
                     <TableHead>Product</TableHead>
                     <TableHead>Category</TableHead>
+                    {sellerWarehouses.length > 1 && <TableHead>Warehouse</TableHead>}
                     <TableHead>Price</TableHead>
                     <TableHead>Stock</TableHead>
                     <TableHead>Weight</TableHead>
@@ -327,6 +350,11 @@ export default function SellerInventoryPage() {
                         </div>
                       </TableCell>
                       <TableCell className="text-muted-foreground">{product.category}</TableCell>
+                      {sellerWarehouses.length > 1 && (
+                        <TableCell className="text-muted-foreground">
+                          {sellerWarehouses.find((w) => w.id === product.warehouseId)?.name ?? "—"}
+                        </TableCell>
+                      )}
                       <TableCell>{formatCurrency(product.price)}</TableCell>
                       <TableCell>{product.stockQty}</TableCell>
                       <TableCell>{formatWeight(product.weightKg)}</TableCell>
@@ -347,38 +375,64 @@ export default function SellerInventoryPage() {
         </TabsContent>
 
         <TabsContent value="warehouses">
-          {sellerWarehouse && (
-            <div className="mb-4 flex flex-col gap-4 rounded-xl border border-border p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-3">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-600">
-                  <WarehouseIcon className="h-5 w-5" />
-                </span>
-                <div>
-                  <p className="font-medium text-foreground">{sellerWarehouse.name}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {sellerWarehouse.latitude.toFixed(4)}, {sellerWarehouse.longitude.toFixed(4)}
-                  </p>
+          <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {sellerWarehouses.map((warehouse) => {
+              const stats = stockByWarehouse.get(warehouse.id) ?? { productCount: 0, totalStock: 0 };
+              return (
+                <div
+                  key={warehouse.id}
+                  className="flex items-center justify-between gap-4 rounded-xl border border-border p-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-orange-50 text-orange-600">
+                      <WarehouseIcon className="h-5 w-5" />
+                    </span>
+                    <div>
+                      <p className="font-medium text-foreground">{warehouse.name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {warehouse.latitude.toFixed(4)}, {warehouse.longitude.toFixed(4)}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="text-right text-sm">
+                      <p className="text-muted-foreground">
+                        {stats.productCount} product{stats.productCount === 1 ? "" : "s"}
+                      </p>
+                      <p className="font-medium text-foreground">
+                        {stats.totalStock} / {warehouse.capacity} units
+                      </p>
+                    </div>
+                    <Button variant="ghost" size="icon-sm" onClick={() => openEditWarehouse(warehouse)}>
+                      <Pencil />
+                    </Button>
+                  </div>
                 </div>
-              </div>
-              <div className="flex gap-6 text-sm">
-                <div>
-                  <p className="text-muted-foreground">Products stored</p>
-                  <p className="font-medium text-foreground">{products.length}</p>
-                </div>
-                <div>
-                  <p className="text-muted-foreground">Total stock</p>
-                  <p className="font-medium text-foreground">
-                    {totalStock} / {sellerWarehouse.capacity} units
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+              );
+            })}
+          </div>
 
           <DataTableToolbar
             searchValue={warehouseSearch}
             onSearchChange={setWarehouseSearch}
             searchPlaceholder="Search products..."
+            filters={
+              sellerWarehouses.length > 1 && (
+                <Select value={warehouseFilter} onValueChange={(v) => setWarehouseFilter(v ?? "all")}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Warehouse" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All warehouses</SelectItem>
+                    {sellerWarehouses.map((w) => (
+                      <SelectItem key={w.id} value={w.id}>
+                        {w.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )
+            }
           />
 
           {warehouseProducts.length === 0 ? (
@@ -422,19 +476,17 @@ export default function SellerInventoryPage() {
       </Tabs>
       )}
 
-      {sellerWarehouse && (
-        <WarehouseFormDialog
-          open={warehouseDialogOpen}
-          onOpenChange={setWarehouseDialogOpen}
-          warehouse={sellerWarehouse}
-          onSave={handleWarehouseSave}
-        />
-      )}
+      <WarehouseFormDialog
+        open={warehouseDialogOpen}
+        onOpenChange={setWarehouseDialogOpen}
+        warehouse={editingWarehouse}
+        onSave={handleWarehouseSave}
+      />
       <ProductFormDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         product={editing}
-        warehouseName={warehouseName}
+        warehouses={sellerWarehouses.map((w) => ({ id: w.id, name: w.name }))}
         onSave={handleSave}
       />
       <BulkStockDialog

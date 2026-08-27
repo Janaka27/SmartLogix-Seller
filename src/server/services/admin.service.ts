@@ -57,9 +57,52 @@ export const AdminService = {
   async getUser() {
     const { data, error } = await supabase.auth.getUser();
     if (error) {
+      // No active session is a normal, expected state — not a failure.
+      if (error.name === 'AuthSessionMissingError') return null;
       console.error('Error getting user:', error.message);
       throw new Error(error.message);
     }
     return data.user;
+  },
+
+  // Every platform user (buyers, sellers, admins). Goes through a server
+  // route using the service-role key so the full list always comes back,
+  // regardless of whichever session's RLS would otherwise apply.
+  async getAllUsers() {
+    const response = await fetch('/api/admin/users');
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'Failed to fetch users');
+    }
+    return response.json();
+  },
+
+  // Get all drone requests via server route to bypass RLS
+  async getAllDroneRequests() {
+    const response = await fetch('/api/admin/drone-requests/show');
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'Failed to fetch drone requests');
+    }
+    return response.json();
+  },
+
+  async updateDroneRequestStatus(requestId: string, status: string, adminNotes: string) {
+    const response = await fetch('/api/admin/drone-requests/update', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        requestId,
+        status,
+        adminNotes,
+      }),
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      throw new Error(body.error || 'Failed to update drone request');
+    }
+    return response.json();
   }
 };

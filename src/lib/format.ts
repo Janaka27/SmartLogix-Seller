@@ -26,6 +26,10 @@ export function formatDistance(km: number): string {
   return `${km.toLocaleString(undefined, { maximumFractionDigits: 1 })} km`;
 }
 
+export function formatCoordinates(lat: number, lng: number): string {
+  return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+}
+
 export function formatVolume(cm3: number): string {
   if (cm3 >= 1_000_000) {
     return `${(cm3 / 1_000_000).toFixed(2)} m³`;
