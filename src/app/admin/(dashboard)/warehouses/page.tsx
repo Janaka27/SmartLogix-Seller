@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Warehouse as WarehouseIcon, Plus, Pencil, Zap } from "lucide-react";
+import { Warehouse as WarehouseIcon, Plus, Pencil, Zap, MapPin } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -19,7 +19,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { WarehouseFormDialog } from "@/components/admin/WarehouseFormDialog";
+import { LocationDialog } from "@/components/dashboard/LocationDialog";
 import { WarehouseService } from "@/server/services/warehouse.service";
+import { formatCoordinates } from "@/lib/format";
 import type { Warehouse } from "@/lib/types";
 
 type AdminWarehouse = Warehouse & { activeDroneCount?: number };
@@ -30,6 +32,7 @@ export default function AdminWarehousesPage() {
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Warehouse | null>(null);
+  const [mapWarehouse, setMapWarehouse] = useState<AdminWarehouse | null>(null);
 
   useEffect(() => {
     WarehouseService.getAll()
@@ -105,7 +108,7 @@ export default function AdminWarehousesPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>Warehouse</TableHead>
-                <TableHead>City</TableHead>
+                <TableHead>Location</TableHead>
                 <TableHead>Capacity</TableHead>
                 <TableHead>Drone Docks</TableHead>
                 <TableHead>Active Drones</TableHead>
@@ -118,7 +121,20 @@ export default function AdminWarehousesPage() {
                 return (
                   <TableRow key={warehouse.id}>
                     <TableCell className="font-medium text-foreground">{warehouse.name}</TableCell>
-                    <TableCell className="text-muted-foreground">{warehouse.city}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      <button
+                        type="button"
+                        onClick={() => setMapWarehouse(warehouse)}
+                        className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+                      >
+                        <MapPin className="h-3 w-3 shrink-0" />
+                        {warehouse.city || (
+                          <span className="text-xs">
+                            {formatCoordinates(warehouse.latitude, warehouse.longitude)}
+                          </span>
+                        )}
+                      </button>
+                    </TableCell>
                     <TableCell>{warehouse.capacity.toLocaleString()}</TableCell>
                     <TableCell>{warehouse.droneDockCount}</TableCell>
                     <TableCell>{warehouse.activeDroneCount ?? 0}</TableCell>
@@ -149,6 +165,15 @@ export default function AdminWarehousesPage() {
         onOpenChange={setDialogOpen}
         warehouse={editing}
         onSave={handleSave}
+      />
+
+      <LocationDialog
+        open={!!mapWarehouse}
+        onOpenChange={(open) => !open && setMapWarehouse(null)}
+        title={mapWarehouse?.name ?? ""}
+        subtitle={mapWarehouse?.city}
+        latitude={mapWarehouse?.latitude ?? 0}
+        longitude={mapWarehouse?.longitude ?? 0}
       />
     </div>
   );
