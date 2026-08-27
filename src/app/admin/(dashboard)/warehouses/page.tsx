@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Warehouse as WarehouseIcon, Plus, Pencil, Zap, MapPin } from "lucide-react";
+import { Warehouse as WarehouseIcon, Plus, Pencil, Zap, MapPin, List, Map as MapIcon } from "lucide-react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/PageHeader";
@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { WarehouseFormDialog } from "@/components/admin/WarehouseFormDialog";
 import { LocationDialog } from "@/components/dashboard/LocationDialog";
+import { LocationsMap } from "@/components/dashboard/LocationsMap";
 import { WarehouseService } from "@/server/services/warehouse.service";
 import { formatCoordinates } from "@/lib/format";
 import type { Warehouse } from "@/lib/types";
@@ -100,64 +102,99 @@ export default function AdminWarehousesPage() {
             <Skeleton key={i} className="h-12 w-full" />
           ))}
         </div>
-      ) : filtered.length === 0 ? (
-        <EmptyState icon={WarehouseIcon} title="No warehouses found" />
       ) : (
-        <div className="rounded-xl border border-border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Warehouse</TableHead>
-                <TableHead>Location</TableHead>
-                <TableHead>Capacity</TableHead>
-                <TableHead>Drone Docks</TableHead>
-                <TableHead>Active Drones</TableHead>
-                <TableHead>Charging</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filtered.map((warehouse) => {
-                return (
-                  <TableRow key={warehouse.id}>
-                    <TableCell className="font-medium text-foreground">{warehouse.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <button
-                        type="button"
-                        onClick={() => setMapWarehouse(warehouse)}
-                        className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
-                      >
-                        <MapPin className="h-3 w-3 shrink-0" />
-                        {warehouse.city || (
-                          <span className="text-xs">
-                            {formatCoordinates(warehouse.latitude, warehouse.longitude)}
-                          </span>
-                        )}
-                      </button>
-                    </TableCell>
-                    <TableCell>{warehouse.capacity.toLocaleString()}</TableCell>
-                    <TableCell>{warehouse.droneDockCount}</TableCell>
-                    <TableCell>{warehouse.activeDroneCount ?? 0}</TableCell>
-                    <TableCell>
-                      {warehouse.chargingStation ? (
-                        <Badge variant="secondary" className="border-0 bg-orange-50 text-orange-700">
-                          <Zap className="h-3 w-3" /> Yes
-                        </Badge>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">No</span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="icon-sm" onClick={() => openEdit(warehouse)}>
-                        <Pencil />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <Tabs defaultValue="list">
+          <TabsList>
+            <TabsTrigger value="list">
+              <List /> List
+            </TabsTrigger>
+            <TabsTrigger value="map">
+              <MapIcon /> Map view
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="list">
+            {filtered.length === 0 ? (
+              <EmptyState icon={WarehouseIcon} title="No warehouses found" />
+            ) : (
+              <div className="rounded-xl border border-border">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Warehouse</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Capacity</TableHead>
+                      <TableHead>Drone Docks</TableHead>
+                      <TableHead>Active Drones</TableHead>
+                      <TableHead>Charging</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filtered.map((warehouse) => {
+                      return (
+                        <TableRow key={warehouse.id}>
+                          <TableCell className="font-medium text-foreground">{warehouse.name}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            <button
+                              type="button"
+                              onClick={() => setMapWarehouse(warehouse)}
+                              className="inline-flex items-center gap-1 hover:text-foreground hover:underline"
+                            >
+                              <MapPin className="h-3 w-3 shrink-0" />
+                              {warehouse.city || (
+                                <span className="text-xs">
+                                  {formatCoordinates(warehouse.latitude, warehouse.longitude)}
+                                </span>
+                              )}
+                            </button>
+                          </TableCell>
+                          <TableCell>{warehouse.capacity.toLocaleString()}</TableCell>
+                          <TableCell>{warehouse.droneDockCount}</TableCell>
+                          <TableCell>{warehouse.activeDroneCount ?? 0}</TableCell>
+                          <TableCell>
+                            {warehouse.chargingStation ? (
+                              <Badge variant="secondary" className="border-0 bg-orange-50 text-orange-700">
+                                <Zap className="h-3 w-3" /> Yes
+                              </Badge>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">No</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button variant="ghost" size="icon-sm" onClick={() => openEdit(warehouse)}>
+                              <Pencil />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="map">
+            {filtered.length === 0 ? (
+              <EmptyState icon={WarehouseIcon} title="No warehouses found" />
+            ) : (
+              <LocationsMap
+                locations={filtered.map((w) => ({
+                  id: w.id,
+                  name: w.name,
+                  subtitle: `${w.city || formatCoordinates(w.latitude, w.longitude)} · Capacity ${w.capacity.toLocaleString()} · ${w.droneDockCount} drone docks`,
+                  latitude: w.latitude,
+                  longitude: w.longitude,
+                }))}
+                onSelect={(id) => {
+                  const warehouse = filtered.find((w) => w.id === id);
+                  if (warehouse) openEdit(warehouse);
+                }}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
       )}
 
       <WarehouseFormDialog
