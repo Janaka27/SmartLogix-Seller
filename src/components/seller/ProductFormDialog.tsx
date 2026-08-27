@@ -49,13 +49,15 @@ const productSchema = z.object({
 
 type ProductFormValues = z.infer<typeof productSchema>;
 
-export type ProductFormSubmitValues = ProductFormValues & { images: string[] };
+export type ProductFormSubmitValues = ProductFormValues & { images: string[]; warehouseId: string };
 
 interface ProductFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   product?: Product | null;
-  warehouseName: string;
+  // Every warehouse this seller can stock the product in. One entry keeps
+  // the dialog exactly as before (no picker shown); 2+ shows a selector.
+  warehouses: { id: string; name: string }[];
   onSave: (values: ProductFormSubmitValues) => void;
 }
 
@@ -87,7 +89,7 @@ export function ProductFormDialog({
   open,
   onOpenChange,
   product,
-  warehouseName,
+  warehouses,
   onSave,
 }: ProductFormDialogProps) {
   const {
@@ -106,6 +108,7 @@ export function ProductFormDialog({
   const [newImages, setNewImages] = useState<NewImageFile[]>([]);
   const [imageError, setImageError] = useState<string | null>(null);
   const [uploadingImages, setUploadingImages] = useState(false);
+  const [warehouseId, setWarehouseId] = useState<string>("");
 
   useEffect(() => {
     if (open) {
@@ -132,8 +135,9 @@ export function ProductFormDialog({
         return [];
       });
       setImageError(null);
+      setWarehouseId(product?.warehouseId ?? warehouses[0]?.id ?? "");
     }
-  }, [open, product, reset]);
+  }, [open, product, warehouses, reset]);
 
   // Revoke object URLs for previews when the dialog unmounts.
   useEffect(() => {
@@ -201,6 +205,11 @@ export function ProductFormDialog({
       return;
     }
 
+    if (!warehouseId) {
+      toast.error("Select a warehouse to stock this product in.");
+      return;
+    }
+
     try {
       let uploadedUrls: string[] = [];
       if (newImages.length > 0) {
@@ -222,7 +231,7 @@ export function ProductFormDialog({
         uploadedUrls = body.urls as string[];
       }
 
-      onSave({ ...values, images: [...existingImages, ...uploadedUrls] });
+      onSave({ ...values, images: [...existingImages, ...uploadedUrls], warehouseId });
       toast.success(product ? "Product updated" : "Product added");
       onOpenChange(false);
     } catch (err) {
@@ -239,8 +248,11 @@ export function ProductFormDialog({
         <DialogHeader>
           <DialogTitle>{product ? "Edit Product" : "Add Product"}</DialogTitle>
           <DialogDescription>
-            Stored in {warehouseName}. Weight and dimensions are validated against the SmartLogix
-            drone fleet before this product can go live.
+            {warehouses.length <= 1 && warehouses[0]
+              ? `Stored in ${warehouses[0].name}. `
+              : ""}
+            Weight and dimensions are validated against the SmartLogix drone fleet before this
+            product can go live.
           </DialogDescription>
         </DialogHeader>
 
@@ -250,6 +262,24 @@ export function ProductFormDialog({
             <Input id="name" {...register("name")} />
             {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
           </div>
+
+          {warehouses.length > 1 && (
+            <div className="space-y-1.5">
+              <Label htmlFor="warehouseId">Warehouse</Label>
+              <Select value={warehouseId} onValueChange={(v) => v && setWarehouseId(v)}>
+                <SelectTrigger id="warehouseId" className="w-full">
+                  <SelectValue placeholder="Select a warehouse" />
+                </SelectTrigger>
+                <SelectContent>
+                  {warehouses.map((wh) => (
+                    <SelectItem key={wh.id} value={wh.id}>
+                      {wh.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <Label htmlFor="description">Description</Label>

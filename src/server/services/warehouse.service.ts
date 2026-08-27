@@ -48,11 +48,17 @@ export const WarehouseService = {
         return (data || []).map(mapToFrontend);
     },
 
+    // A seller can have more than one warehouse — this returns their oldest
+    // one only, for pages that just need "a" warehouse to work with (e.g.
+    // Store Settings, Drone Fleet). Use getAllBySeller for anything that
+    // should reflect every warehouse the seller has.
     async getBySeller(sellerId: string) {
         const { data, error } = await supabase
             .from('warehouses')
             .select('*')
             .eq('seller_id', sellerId)
+            .order('created_at', { ascending: true })
+            .limit(1)
             .maybeSingle();
 
         if (error) {
@@ -60,6 +66,20 @@ export const WarehouseService = {
             throw new Error(error.message);
         }
         return mapToFrontend(data);
+    },
+
+    async getAllBySeller(sellerId: string) {
+        const { data, error } = await supabase
+            .from('warehouses')
+            .select('*')
+            .eq('seller_id', sellerId)
+            .order('created_at', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching warehouses:', error.message);
+            throw new Error(error.message);
+        }
+        return (data || []).map(mapToFrontend);
     },
 
     async create(warehouseData: WarehouseInput) {
