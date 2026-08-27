@@ -1,13 +1,15 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Warehouse as WarehouseIcon, Plus, Pencil, Zap } from "lucide-react";
+import { toast } from "sonner";
 
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { DataTableToolbar } from "@/components/dashboard/DataTableToolbar";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -17,14 +19,27 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { WarehouseFormDialog } from "@/components/admin/WarehouseFormDialog";
-import { warehouses as seedWarehouses, drones } from "@/lib/mock-data";
+import { WarehouseService } from "@/server/services/warehouse.service";
 import type { Warehouse } from "@/lib/types";
 
+type AdminWarehouse = Warehouse & { activeDroneCount?: number };
+
 export default function AdminWarehousesPage() {
-  const [warehouses, setWarehouses] = useState<Warehouse[]>(seedWarehouses);
+  const [warehouses, setWarehouses] = useState<AdminWarehouse[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Warehouse | null>(null);
+
+  useEffect(() => {
+    WarehouseService.getAll()
+      .then((data) => setWarehouses(data as unknown as AdminWarehouse[]))
+      .catch((err) => {
+        console.error("Failed to load warehouses", err);
+        toast.error("Failed to load warehouses");
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = useMemo(
     () => warehouses.filter((w) => w.name.toLowerCase().includes(search.toLowerCase())),
@@ -41,14 +56,20 @@ export default function AdminWarehousesPage() {
     setDialogOpen(true);
   };
 
-  const handleSave = (values: Omit<Warehouse, "id">) => {
-    if (editing) {
-      setWarehouses((prev) => prev.map((w) => (w.id === editing.id ? { ...w, ...values } : w)));
-    } else {
-      setWarehouses((prev) => [
-        { id: `wh-${Math.random().toString(36).slice(2, 8)}`, ...values },
-        ...prev,
-      ]);
+  const handleSave = async (values: Omit<Warehouse, "id">) => {
+    try {
+      if (editing) {
+        const updated = await WarehouseService.update(editing.id, values);
+        setWarehouses((prev) =>
+          prev.map((w) => (w.id === editing.id ? { ...w, ...updated } : w))
+        );
+      } else {
+        const created = await WarehouseService.create(values);
+        setWarehouses((prev) => [created as unknown as AdminWarehouse, ...prev]);
+      }
+    } catch (err) {
+      console.error("Failed to save warehouse", err);
+      toast.error("Failed to save warehouse");
     }
   };
 
@@ -70,7 +91,13 @@ export default function AdminWarehousesPage() {
         searchPlaceholder="Search warehouses..."
       />
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState icon={WarehouseIcon} title="No warehouses found" />
       ) : (
         <div className="rounded-xl border border-border">
@@ -88,14 +115,13 @@ export default function AdminWarehousesPage() {
             </TableHeader>
             <TableBody>
               {filtered.map((warehouse) => {
-                const droneCount = drones.filter((d) => d.homeWarehouseId === warehouse.id).length;
                 return (
                   <TableRow key={warehouse.id}>
                     <TableCell className="font-medium text-foreground">{warehouse.name}</TableCell>
                     <TableCell className="text-muted-foreground">{warehouse.city}</TableCell>
                     <TableCell>{warehouse.capacity.toLocaleString()}</TableCell>
                     <TableCell>{warehouse.droneDockCount}</TableCell>
-                    <TableCell>{droneCount}</TableCell>
+                    <TableCell>{warehouse.activeDroneCount ?? 0}</TableCell>
                     <TableCell>
                       {warehouse.chargingStation ? (
                         <Badge variant="secondary" className="border-0 bg-orange-50 text-orange-700">

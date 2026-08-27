@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { MoreHorizontal, Store, Check, X, Ban, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
@@ -8,6 +8,7 @@ import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { DataTableToolbar } from "@/components/dashboard/DataTableToolbar";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Select,
   SelectContent,
@@ -30,14 +31,25 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { sellers as seedSellers } from "@/lib/mock-data";
+import { SellerService } from "@/server/services/seller.service";
 import { formatDate } from "@/lib/format";
 import type { Seller, SellerStatus } from "@/lib/types";
 
 export default function AdminSellersPage() {
-  const [sellers, setSellers] = useState<Seller[]>(seedSellers);
+  const [sellers, setSellers] = useState<Seller[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<SellerStatus | "all">("all");
+
+  useEffect(() => {
+    SellerService.getAllSellers()
+      .then((data) => setSellers(data as unknown as Seller[]))
+      .catch((err) => {
+        console.error("Failed to load sellers", err);
+        toast.error("Failed to load sellers");
+      })
+      .finally(() => setLoading(false));
+  }, []);
 
   const filtered = useMemo(() => {
     return sellers.filter((s) => {
@@ -49,9 +61,15 @@ export default function AdminSellersPage() {
     });
   }, [sellers, search, statusFilter]);
 
-  const setStatus = (seller: Seller, status: SellerStatus) => {
-    setSellers((prev) => prev.map((s) => (s.id === seller.id ? { ...s, status } : s)));
-    toast.success(`${seller.businessName} ${status}`);
+  const setStatus = async (seller: Seller, status: SellerStatus) => {
+    try {
+      await SellerService.updateSellerStatus(seller.id, status);
+      setSellers((prev) => prev.map((s) => (s.id === seller.id ? { ...s, status } : s)));
+      toast.success(`${seller.businessName} ${status}`);
+    } catch (err) {
+      console.error("Failed to update seller status", err);
+      toast.error("Failed to update seller status");
+    }
   };
 
   return (
@@ -78,7 +96,13 @@ export default function AdminSellersPage() {
         }
       />
 
-      {filtered.length === 0 ? (
+      {loading ? (
+        <div className="space-y-2">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-12 w-full" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <EmptyState icon={Store} title="No sellers found" />
       ) : (
         <div className="rounded-xl border border-border">
