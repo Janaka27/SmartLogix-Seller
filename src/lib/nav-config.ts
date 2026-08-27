@@ -50,6 +50,7 @@ export const adminNavGroups: NavGroup[] = [
     label: "Management",
     items: [
       { title: "Sellers", href: "/admin/sellers", icon: Store },
+      { title: "Products", href: "/admin/products", icon: Package },
       { title: "Warehouses", href: "/admin/warehouses", icon: Warehouse },
       { title: "Drone Fleet", href: "/admin/drones", icon: DroneIcon },
       { title: "Users & Roles", href: "/admin/users", icon: Users },

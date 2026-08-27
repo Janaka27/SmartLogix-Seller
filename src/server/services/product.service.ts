@@ -47,6 +47,24 @@ function mapToFrontend(dbProduct: any) {
 }
 
 export const ProductService = {
+    // Admin-only: every product across every seller, with its warehouse.
+    async getAllProducts() {
+        const { data, error } = await supabase
+            .from('products')
+            .select('*, warehouse:warehouses!products_warehouse_id_fkey ( name, city )')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching all products:', error.message);
+            throw new Error(error.message);
+        }
+        return (data || []).map((row: any) => ({
+            ...mapToFrontend(row),
+            warehouseName: row.warehouse?.name ?? 'Unknown warehouse',
+            warehouseCity: row.warehouse?.city ?? '',
+        }));
+    },
+
     async getProducts(sellerId: string) {
         const { data, error } = await supabase
             .from('products')
