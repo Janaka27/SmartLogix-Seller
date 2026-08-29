@@ -106,14 +106,19 @@ export function AdminNotificationsProvider({ children }: { children: ReactNode }
 
     setNotifications((prev) => [notification, ...prev].slice(0, MAX_NOTIFICATIONS));
     setUnreadCount((prev) => prev + 1);
-    setPendingCount((prev) => prev + 1);
+    // Refetch from the server rather than incrementing locally — an
+    // optimistic +1 here could drift from the real admin-only list (e.g. it
+    // stayed stuck above zero for a session that isn't actually an admin,
+    // since this INSERT event fires from realtime/RLS regardless of admin
+    // access, while the authoritative list never showed anything).
+    refreshPendingCount();
 
     toast.warning("New drone request", {
       description: `${notification.requestedQuantity} drone${notification.requestedQuantity > 1 ? "s" : ""} requested — ${notification.reason}`,
       position: "top-center",
       duration: 6000,
     });
-  }, []);
+  }, [refreshPendingCount]);
 
   useDroneRequests(handleNewRequest);
 

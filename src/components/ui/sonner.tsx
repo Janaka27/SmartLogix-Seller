@@ -10,6 +10,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
+      richColors
       className="toaster group"
       icons={{
         success: (
@@ -34,6 +35,21 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          // Sonner falls back to its own (barely-there) defaults for typed
+          // toasts unless these are set explicitly — match the same
+          // semantic colors StatusBadge already uses app-wide.
+          "--success-bg": "var(--color-emerald-50)",
+          "--success-text": "var(--color-emerald-700)",
+          "--success-border": "var(--color-emerald-200)",
+          "--info-bg": "var(--color-blue-50)",
+          "--info-text": "var(--color-blue-700)",
+          "--info-border": "var(--color-blue-200)",
+          "--warning-bg": "var(--color-amber-50)",
+          "--warning-text": "var(--color-amber-800)",
+          "--warning-border": "var(--color-amber-200)",
+          "--error-bg": "var(--color-red-50)",
+          "--error-text": "var(--color-red-700)",
+          "--error-border": "var(--color-red-200)",
         } as React.CSSProperties
       }
       toastOptions={{

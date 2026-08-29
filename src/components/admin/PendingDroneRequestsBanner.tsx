@@ -30,6 +30,7 @@ export function PendingDroneRequestsBanner() {
           size="sm"
           variant="outline"
           className="h-7 border-orange-300 bg-white text-orange-700 hover:bg-orange-100"
+          nativeButton={false}
           render={<Link href="/admin/drones" />}
         >
           Review
