@@ -9,9 +9,7 @@ import { EmptyState } from "@/components/dashboard/EmptyState";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { sellers, drones, orders, warehouses } from "@/lib/mock-data";
 import { formatCurrency, formatDateTime } from "@/lib/format";
-
-import { useCallback, useState } from "react";
-import { useDroneRequests } from "@/hooks/useDroneRequests";
+import { useAdminNotifications } from "@/components/admin/AdminNotificationsContext";
 
 export default function AdminDashboardPage() {
   const pendingSellers = sellers.filter((s) => s.status === "pending");
@@ -27,21 +25,7 @@ export default function AdminDashboardPage() {
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     .slice(0, 6);
 
-    const [notifications, setNotifications] = useState<any[]>([]);
-
-    const handleNewRequest = useCallback((request: any) => {
-        console.log("🚁 New request received!");
-        
-        // Show a visual toast notification
-        // toast.info(`🚁 New Drone Request: ${request.requested_quantity} drones requested!`);
-
-        setNotifications((current) => [
-            request,
-            ...current,
-        ]);
-    }, []);
-
-    useDroneRequests(handleNewRequest);
+    const { notifications } = useAdminNotifications();
 
   return (
     <div>
@@ -113,31 +97,32 @@ export default function AdminDashboardPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-none border-blue-100 bg-blue-50/30">
+          <Card className="shadow-none border-orange-100 bg-orange-50/30">
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-blue-800">
+              <CardTitle className="flex items-center gap-2 text-orange-800">
                 <Bell className="h-4 w-4" /> Live Notifications
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               {notifications.length === 0 ? (
                 <div className="flex flex-col items-center py-4 text-center">
-                  <Bell className="mb-2 h-8 w-8 text-blue-200" />
-                  <p className="text-sm font-medium text-blue-900">No new notifications</p>
-                  <p className="text-xs text-blue-700/70">Listening for incoming requests...</p>
+                  <Bell className="mb-2 h-8 w-8 text-orange-200" />
+                  <p className="text-sm font-medium text-orange-900">No new notifications</p>
+                  <p className="text-xs text-orange-700/70">Listening for incoming requests...</p>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3">
-                  {notifications.map((notif, i) => (
-                    <div key={i} className="flex flex-col gap-1 rounded-md bg-white p-3 shadow-sm border border-blue-100">
-                      <div className="flex justify-between items-start">
-                        <p className="text-sm font-semibold text-foreground">
-                          New Drone Request
-                        </p>
-                        <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 rounded-full font-medium">Just now</span>
+                  {notifications.map((notif) => (
+                    <div key={notif.id} className="flex flex-col gap-1 rounded-md border border-orange-100 bg-white p-3 shadow-sm">
+                      <div className="flex items-start justify-between">
+                        <p className="text-sm font-semibold text-foreground">New Drone Request</p>
+                        <span className="rounded-full bg-orange-100 px-1.5 text-[10px] font-medium text-orange-800">
+                          {formatDateTime(notif.createdAt)}
+                        </span>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        <span className="font-medium text-foreground">{notif.requested_quantity}</span> drones requested for: {notif.reason}
+                        <span className="font-medium text-foreground">{notif.requestedQuantity}</span> drones
+                        requested for: {notif.reason}
                       </p>
                     </div>
                   ))}

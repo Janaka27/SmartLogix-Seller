@@ -25,7 +25,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { AdminService } from "@/server/services/admin.service";
+import { AdminService, isUnauthorizedError } from "@/server/services/admin.service";
 import { formatDate } from "@/lib/format";
 
 type PlatformRole = "buyer" | "seller" | "admin";
@@ -71,8 +71,12 @@ export default function AdminUsersPage() {
     AdminService.getAllUsers()
       .then((data) => setUsers(data as PlatformUser[]))
       .catch((err) => {
-        console.error("Failed to load users", err);
-        toast.error("Failed to load users");
+        // Nothing gates this page by role yet, so a non-admin session lands
+        // here too and gets a 401 — expected, not worth logging or toasting.
+        if (!isUnauthorizedError(err)) {
+          console.error("Failed to load users", err);
+          toast.error("Failed to load users");
+        }
       })
       .finally(() => setLoading(false));
   }, []);
