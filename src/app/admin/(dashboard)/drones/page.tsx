@@ -16,11 +16,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
 import { DroneFormDialog } from "@/components/admin/DroneFormDialog";
 import { drones as seedDrones, warehouses } from "@/lib/mock-data";
-import { AdminService } from "@/server/services/admin.service";
+import { AdminService, isUnauthorizedError } from "@/server/services/admin.service";
 import { formatDateTime } from "@/lib/format";
 import type { Drone, DroneRequest, DroneStatus } from "@/lib/types";
 
@@ -37,9 +38,36 @@ const URGENCY_STYLES: Record<DroneRequest["urgency"], string> = {
   high: "bg-red-50 text-red-700",
 };
 
+function DroneRequestsSkeleton() {
+  return (
+    <div className="space-y-3">
+      {Array.from({ length: 3 }).map((_, i) => (
+        <Card key={i} className="shadow-none" size="sm">
+          <div className="flex flex-col gap-3 px-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 flex-1 space-y-2">
+              <div className="flex items-center gap-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-5 w-16 rounded-full" />
+                <Skeleton className="h-5 w-20 rounded-full" />
+              </div>
+              <Skeleton className="h-3.5 w-3/4" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+            <div className="flex w-full shrink-0 gap-2 sm:w-64">
+              <Skeleton className="h-8 flex-1" />
+              <Skeleton className="h-8 flex-1" />
+            </div>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 export default function AdminDronesPage() {
   const [drones, setDrones] = useState<Drone[]>(seedDrones);
   const [requests, setRequests] = useState<DroneRequest[]>([]);
+  const [requestsLoading, setRequestsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Drone | null>(null);
 
@@ -63,12 +91,16 @@ export default function AdminDronesPage() {
       })) as DroneRequest[];
       setRequests(mappedReqs);
     } catch (err) {
-      console.error("Failed to load requests:", err);
+      // Nothing gates this page by role yet, so a non-admin session lands
+      // here too and gets a 401 — expected, not worth logging as an error.
+      if (!isUnauthorizedError(err)) {
+        console.error("Failed to load requests:", err);
+      }
     }
   };
 
   useEffect(() => {
-    loadRequests();
+    loadRequests().finally(() => setRequestsLoading(false));
   }, []);
 
   const handleUpdateStatus = async (req: DroneRequest, status: string) => {
@@ -188,7 +220,9 @@ export default function AdminDronesPage() {
 
       <div className="mt-8">
         <h2 className="mb-3 text-sm font-semibold text-foreground">Drone Requests from Sellers</h2>
-        {requests.length === 0 ? (
+        {requestsLoading ? (
+          <DroneRequestsSkeleton />
+        ) : requests.length === 0 ? (
           <EmptyState
             icon={MessageSquare}
             title="No drone requests"

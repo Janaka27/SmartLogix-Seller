@@ -11,6 +11,7 @@ import {
   Weight,
   Box,
   X,
+  Trash2,
   MoreHorizontal,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -31,14 +32,25 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   RequestDroneDialog,
   type DroneRequestFormValues,
 } from "@/components/seller/RequestDroneDialog";
 import { formatDateTime, formatDistance, formatWeight } from "@/lib/format";
-import type { Drone, DroneRequest, DroneStatus } from "@/lib/types";
+import type { Drone, DroneRequest, DroneRequestStatus, DroneStatus } from "@/lib/types";
 import { SellerService } from "@/server/services/seller.service";
 import { WarehouseService } from "@/server/services/warehouse.service";
 import { DroneService } from "@/server/services/drone.service";
+import { createClient } from "@/lib/supabase";
 
 const STATUS_ACCENT: Record<Drone["status"], string> = {
   available: "text-emerald-600",
@@ -85,6 +97,7 @@ export default function SellerDronesPage() {
   const [drones, setDrones] = useState<Drone[]>([]);
   const [requests, setRequests] = useState<DroneRequest[]>([]);
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
+  const [deletingRequest, setDeletingRequest] = useState<DroneRequest | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -117,6 +130,48 @@ export default function SellerDronesPage() {
     };
     load();
   }, [router]);
+
+  // Keep this page's own list in sync if admin decides on a request while
+  // the seller is already looking at it (the toast in the layout covers the
+  // "not on this page" case).
+  useEffect(() => {
+    if (!sellerId) return;
+
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`seller-drone-requests-list-${sellerId}`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "drone_requests", filter: `seller_id=eq.${sellerId}` },
+        (payload) => {
+          const row = payload.new as {
+            id: string;
+            status: DroneRequestStatus;
+            admin_notes: string | null;
+            updated_at: string;
+            reviewed_at: string | null;
+          };
+          setRequests((prev) =>
+            prev.map((r) =>
+              r.id === row.id
+                ? {
+                    ...r,
+                    status: row.status,
+                    adminNotes: row.admin_notes ?? undefined,
+                    updatedAt: row.updated_at,
+                    reviewedAt: row.reviewed_at ?? undefined,
+                  }
+                : r
+            )
+          );
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [sellerId]);
 
   const counts = useMemo(() => {
     return {
@@ -159,6 +214,19 @@ export default function SellerDronesPage() {
       toast.success("Request cancelled");
     } catch (err: any) {
       toast.error(err.message || "Failed to cancel request");
+    }
+  };
+
+  const handleDeleteRequest = async () => {
+    if (!deletingRequest) return;
+    try {
+      await DroneService.deleteRequest(deletingRequest.id);
+      setRequests((prev) => prev.filter((r) => r.id !== deletingRequest.id));
+      toast.success("Request deleted");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to delete request");
+    } finally {
+      setDeletingRequest(null);
     }
   };
 
@@ -333,6 +401,16 @@ export default function SellerDronesPage() {
                           <X /> Cancel
                         </Button>
                       )}
+                      {req.status === "cancelled" && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="shrink-0 text-destructive hover:text-destructive"
+                          onClick={() => setDeletingRequest(req)}
+                        >
+                          <Trash2 /> Delete
+                        </Button>
+                      )}
                     </div>
                   </Card>
                 ))}
@@ -347,6 +425,25 @@ export default function SellerDronesPage() {
         onOpenChange={setRequestDialogOpen}
         onSave={handleRequestSave}
       />
+
+      <AlertDialog open={!!deletingRequest} onOpenChange={(open) => !open && setDeletingRequest(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this request?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This removes the cancelled request for {deletingRequest?.requestedQuantity} drone
+              {deletingRequest && deletingRequest.requestedQuantity > 1 ? "s" : ""} permanently. This can&apos;t be
+              undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep it</AlertDialogCancel>
+            <AlertDialogAction variant="destructive" onClick={handleDeleteRequest}>
+              <Trash2 /> Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

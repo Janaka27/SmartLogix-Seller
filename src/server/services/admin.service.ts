@@ -2,6 +2,28 @@ import { createClient } from '@/lib/supabase';
 
 const supabase = createClient();
 
+// Thrown by AdminService's server-route calls so callers can tell "you're
+// not an admin" (expected, not worth logging as an error — nothing gates
+// the admin panel by role, so this happens for any non-admin session that
+// browses there) apart from a genuine failure.
+export class AdminApiError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'AdminApiError';
+    this.status = status;
+  }
+}
+
+export function isUnauthorizedError(err: unknown): err is AdminApiError {
+  return err instanceof AdminApiError && err.status === 401;
+}
+
+async function throwAdminApiError(response: Response, fallbackMessage: string): Promise<never> {
+  const body = await response.json().catch(() => ({}));
+  throw new AdminApiError(body.error || fallbackMessage, response.status);
+}
+
 export const AdminService = {
   async login(email: string, password: string) {
     const { data, error } = await supabase.auth.signInWithPassword({
@@ -71,8 +93,7 @@ export const AdminService = {
   async getAllUsers() {
     const response = await fetch('/api/admin/users');
     if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.error || 'Failed to fetch users');
+      await throwAdminApiError(response, 'Failed to fetch users');
     }
     return response.json();
   },
@@ -81,8 +102,7 @@ export const AdminService = {
   async getAllDroneRequests() {
     const response = await fetch('/api/admin/drone-requests/show');
     if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.error || 'Failed to fetch drone requests');
+      await throwAdminApiError(response, 'Failed to fetch drone requests');
     }
     return response.json();
   },
@@ -100,8 +120,7 @@ export const AdminService = {
       }),
     });
     if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.error || 'Failed to update drone request');
+      await throwAdminApiError(response, 'Failed to update drone request');
     }
     return response.json();
   }

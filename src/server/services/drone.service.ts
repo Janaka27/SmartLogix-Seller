@@ -129,4 +129,15 @@ export const DroneService = {
     }
     return mapDroneRequest(data);
   },
+
+  // Only cancelled requests are deletable (RLS-enforced) — clears them out
+  // of the list instead of leaving cancelled clutter around forever.
+  async deleteRequest(id: string): Promise<void> {
+    const { error } = await supabase.from('drone_requests').delete().eq('id', id);
+
+    if (error) {
+      console.error('Error deleting drone request:', error.message);
+      throw new Error(error.message);
+    }
+  },
 };

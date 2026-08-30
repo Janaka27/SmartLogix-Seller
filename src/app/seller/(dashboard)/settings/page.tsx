@@ -92,9 +92,9 @@ export default function SellerSettingsPage() {
         }
         setSellerId(user.id);
 
-        const [settings, warehouse] = await Promise.all([
+        const [settings, warehouses] = await Promise.all([
           SellerService.getMySettings(user.id),
-          WarehouseService.getBySeller(user.id),
+          WarehouseService.getAllBySeller(user.id),
         ]);
 
         reset({
@@ -107,9 +107,7 @@ export default function SellerSettingsPage() {
         setPayoutMethod(settings.payoutMethod);
         setLogoUrl(settings.logoUrl);
         setMyWarehouses(
-          warehouse
-            ? [{ id: warehouse.id, name: warehouse.name, chargingStation: warehouse.chargingStation }]
-            : []
+          warehouses.map((w) => ({ id: w.id, name: w.name, chargingStation: w.chargingStation }))
         );
       } catch (err) {
         console.error("Failed to load store settings", err);
