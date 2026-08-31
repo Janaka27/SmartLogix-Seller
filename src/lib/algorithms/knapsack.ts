@@ -14,11 +14,7 @@ export interface KnapsackResult {
   executionTimeMs: number;
 }
 
-// Standard 0/1 knapsack DP over weight (discretized to 0.1kg steps), then
-// volume is applied as a feasibility filter on the selected set — dropping
-// the lowest value-per-volume items until it fits the cargo bay. This
-// mirrors the two-step simplification the design doc suggests for the
-// weight+volume constrained variant.
+
 export function runKnapsack(
   items: KnapsackItem[],
   maxWeightKg: number,
@@ -52,7 +48,7 @@ export function runKnapsack(
     }
   }
 
-  // Volume feasibility filter: drop lowest value/volume items until it fits.
+
   let totalVolume = selected.reduce((sum, item) => sum + item.volumeCm3, 0);
   if (totalVolume > maxVolumeCm3) {
     selected = [...selected].sort((a, b) => a.value / a.volumeCm3 - b.value / b.volumeCm3);
