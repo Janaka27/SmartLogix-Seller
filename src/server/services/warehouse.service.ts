@@ -134,5 +134,19 @@ export const WarehouseService = {
         }
 
         return mapToFrontend(data);
+    },
+
+    async getWarehouseStats(sellerId: string) {
+        const { data, error } = await supabase
+            .rpc('get_warehouse_stock', {
+                p_seller_id: sellerId
+            });
+
+        if (error) {
+            console.error(error);
+            return;
+        }
+
+        console.log(data);
     }
 };

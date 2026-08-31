@@ -61,7 +61,7 @@ interface ProductFormDialogProps {
   onSave: (values: ProductFormSubmitValues) => void;
 }
 
-const MIN_IMAGES = 2;
+const MIN_IMAGES = 1;
 const MAX_IMAGES = 6;
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
@@ -115,18 +115,18 @@ export function ProductFormDialog({
       reset(
         product
           ? {
-              name: product.name,
-              description: product.description,
-              category: product.category,
-              price: product.price,
-              stockQty: product.stockQty,
-              weightKg: product.weightKg,
-              lengthCm: product.lengthCm,
-              widthCm: product.widthCm,
-              heightCm: product.heightCm,
-              fragile: product.fragile,
-              status: product.status,
-            }
+            name: product.name,
+            description: product.description,
+            category: product.category,
+            price: product.price,
+            stockQty: product.stockQty,
+            weightKg: product.weightKg,
+            lengthCm: product.lengthCm,
+            widthCm: product.widthCm,
+            heightCm: product.heightCm,
+            fragile: product.fragile,
+            status: product.status,
+          }
           : EMPTY_VALUES
       );
       setExistingImages(product?.images ?? []);
