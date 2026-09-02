@@ -120,6 +120,11 @@ export default function SellerInventoryPage() {
     fetchUserAndProducts();
   }, [router]);
 
+  useEffect(() => {
+    const stats = WarehouseService.getWarehouseStats(sellerId || "");
+    console.log(stats);
+  }, [sellerId]);
+
   const openAddWarehouse = () => {
     setEditingWarehouse(null);
     setWarehouseDialogOpen(true);

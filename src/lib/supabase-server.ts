@@ -49,3 +49,19 @@ export async function getAdminUserOrNull() {
 
   return user;
 }
+
+// Verifies the request's own session belongs to a seller, using RLS. Returns
+// the RLS-bound client alongside the user so callers can do further reads/
+// writes (e.g. their own warehouses) as that seller, not the service role.
+export async function getSellerContextOrNull() {
+  const supabase = await createServerSupabaseClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return null;
+
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single();
+  if (profile?.role !== "seller") return null;
+
+  return { supabase, user };
+}

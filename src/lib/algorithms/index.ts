@@ -21,3 +21,27 @@ export {
   BATCHING_DRONE_CAPACITY,
   type BatchingOrder,
 } from "./data/batching-orders";
+export {
+  PriorityQueue,
+  prioritizePendingOrders,
+  type PendingOrderRow,
+} from "./priorityQueue";
+export {
+  runOrderDecisionTree,
+
+  type OrderItemRow,
+  type DroneRow,
+  type OrderDecisionResult,
+  type DecisionOutcome,
+  type DroneAssignment,
+} from "./orderDecisionTree";
+export {
+  runDroneKnapsackAssignment,
+  type FullOrderRow,
+  type FullOrderItemRow,
+  type FullDroneRow,
+  type KnapsackAssignmentResult,
+  type KnapsackDecisionOutcome,
+  type DroneAllocation,
+  type AllocatedItem,
+} from "./droneKnapsackAssignment";

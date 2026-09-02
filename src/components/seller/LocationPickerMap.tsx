@@ -45,26 +45,43 @@ export function LocationPickerMap({ latitude, longitude, onChange, className }: 
         iconAnchor: [14, 28],
       });
 
+      const bounds = L.latLngBounds(
+        L.latLng(5.8, 79.5), // South West
+        L.latLng(9.9, 82.0)  // North East
+      );
+
       const map = L.map(containerRef.current, {
         center: [latitude, longitude],
         zoom: 12,
+        minZoom: 7,
+        maxBounds: bounds,
+        maxBoundsViscosity: 1.0,
       });
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19,
+        bounds: bounds,
       }).addTo(map);
 
       const marker = L.marker([latitude, longitude], { icon: pinIcon, draggable: true }).addTo(map);
 
       marker.on("dragend", () => {
         const pos = marker.getLatLng();
-        onChangeRef.current(Number(pos.lat.toFixed(4)), Number(pos.lng.toFixed(4)));
+        // Prevent marker from being dragged outside bounds (Leaflet usually does this automatically with maxBounds, but good to ensure if needed, though maxBounds mostly applies to pan)
+        if (bounds.contains(pos)) {
+          onChangeRef.current(Number(pos.lat.toFixed(4)), Number(pos.lng.toFixed(4)));
+        } else {
+          // Revert to old valid position or snap to bounds
+          marker.setLatLng([latitude, longitude]);
+        }
       });
 
       map.on("click", (e: LeafletMouseEvent) => {
-        marker.setLatLng(e.latlng);
-        onChangeRef.current(Number(e.latlng.lat.toFixed(4)), Number(e.latlng.lng.toFixed(4)));
+        if (bounds.contains(e.latlng)) {
+          marker.setLatLng(e.latlng);
+          onChangeRef.current(Number(e.latlng.lat.toFixed(4)), Number(e.latlng.lng.toFixed(4)));
+        }
       });
 
       mapRef.current = map;

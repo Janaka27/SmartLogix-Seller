@@ -22,6 +22,7 @@ import {
   ShieldAlert,
   Package,
   MapPin,
+  Warehouse as WarehouseIcon,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -33,8 +34,9 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 
-import { SellerService } from "@/server/services/seller.service";
+import { WarehouseManagerService } from "@/server/services/warehouse-manager.service";
 import { WarehouseService } from "@/server/services/warehouse.service";
+import { SellerService } from "@/server/services/seller.service";
 import { prioritizePendingOrders, type PendingOrderRow } from "@/lib/algorithms/priorityQueue";
 import {
   runDroneKnapsackAssignment,
@@ -86,7 +88,6 @@ interface EnrichedResult extends KnapsackAssignmentResult {
   order: FullOrderRow;
   productsById: Record<string, ProductRow>;
   dronesById: Record<string, DroneDisplayRow>;
-  /** raw order_items rows for this order (with product_id for lookup) */
   rawItems: Array<{ product_id: string; quantity: number; weight_kg: number; volume_cm3: number }>;
 }
 
@@ -145,7 +146,6 @@ function ProductCard({
 
   return (
     <div className="flex items-start gap-3 rounded-lg border border-border bg-card px-3 py-2.5">
-      {/* Thumbnail */}
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
         {imageUrl ? (
           <Image src={imageUrl} alt={product?.name ?? "Product"} fill className="object-cover" sizes="48px" />
@@ -156,7 +156,6 @@ function ProductCard({
         )}
       </div>
 
-      {/* Details */}
       <div className="min-w-0 flex-1">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
@@ -179,7 +178,6 @@ function ProductCard({
           </div>
         </div>
 
-        {/* Spec row */}
         <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
           <span className="flex items-center gap-1 text-xs text-muted-foreground">
             <Weight className="h-3 w-3" />
@@ -227,7 +225,6 @@ function DroneDetailCard({
 }) {
   return (
     <div className="mb-3 rounded-lg border border-border bg-muted/30 px-3.5 py-3">
-      {/* Top row: code + split label + status */}
       <div className="flex items-center gap-2">
         <Plane className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
         <span className="font-mono text-sm font-semibold text-foreground">
@@ -247,7 +244,6 @@ function DroneDetailCard({
         </span>
       </div>
 
-      {/* Spec chips row */}
       <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
         <MetaChip icon={Weight} label="max payload" value={formatWeight(drone?.max_payload_kg ?? 0)} />
         <MetaChip icon={Box} label="cargo vol" value={formatVolume(drone?.cargo_bay_volume_cm3 ?? 0)} />
@@ -256,7 +252,6 @@ function DroneDetailCard({
         <MetaChip icon={Route} label="speed" value={`${drone?.speed_kmh ?? 0} km/h`} />
       </div>
 
-      {/* Allocation totals */}
       <div className="mt-2 border-t border-border pt-2 flex gap-4">
         <MetaChip icon={Weight} label="this load" value={formatWeight(totalWeightKg)} />
         <MetaChip icon={Box} label="this load" value={formatVolume(totalVolumeCm3)} />
@@ -282,7 +277,6 @@ function OrderCard({
   const [expanded, setExpanded] = useState(false);
   const shortId = order.id.slice(0, 8).toUpperCase();
 
-  // Build a lookup: product_id → rawItem (for quantity + unit weight per product)
   const rawItemByProductId = useMemo(() => {
     const map = new Map<string, { quantity: number; weight_kg: number; volume_cm3: number }>();
     for (const ri of rawItems) map.set(ri.product_id, ri);
@@ -291,7 +285,6 @@ function OrderCard({
 
   return (
     <Card className="overflow-hidden shadow-none transition-all duration-200 hover:shadow-sm">
-      {/* ── Header ─────────────────────────────────────────────── */}
       <div className="flex items-start justify-between gap-4 px-5 pt-4 pb-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -306,7 +299,6 @@ function OrderCard({
           <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(order.created_at)}</p>
         </div>
 
-        {/* Confirm — only for single-drone ASSIGN */}
         {outcome === "ASSIGN" && allocations.length > 0 && (
           <Button
             size="sm"
@@ -323,7 +315,6 @@ function OrderCard({
         )}
       </div>
 
-      {/* ── Order metrics ────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border px-5 py-3">
         <MetaChip icon={Weight} label="weight" value={formatWeight(Number(order.total_weight_kg))} />
         <MetaChip icon={Box} label="volume" value={formatVolume(Number(order.total_volume_cm3))} />
@@ -332,7 +323,6 @@ function OrderCard({
         )}
       </div>
 
-      {/* ── HOLD banner ──────────────────────────────────────────── */}
       {outcome === "HOLD" ? (
         <div className="flex items-start gap-2 border-t border-border bg-amber-50/50 px-5 py-3 text-sm text-amber-800">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
@@ -340,7 +330,6 @@ function OrderCard({
         </div>
       ) : (
         <>
-          {/* ── Expand toggle ────────────────────────────────────── */}
           <button
             onClick={() => setExpanded((v) => !v)}
             className="flex w-full items-center gap-1.5 border-t border-border px-5 py-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/40"
@@ -355,7 +344,6 @@ function OrderCard({
             <div className="divide-y divide-border border-t border-border">
               {allocations.map((alloc, idx) => (
                 <div key={alloc.droneId} className="px-5 py-4">
-                  {/* Drone detail card */}
                   <DroneDetailCard
                     drone={dronesById[alloc.droneId]}
                     allocationIdx={idx}
@@ -364,7 +352,6 @@ function OrderCard({
                     totalVolumeCm3={alloc.totalVolumeCm3}
                   />
 
-                  {/* Product cards */}
                   <div className="space-y-2">
                     {alloc.items.map((item: AllocatedItem) => {
                       const raw = rawItemByProductId.get(item.product_id);
@@ -541,26 +528,27 @@ function OrdersSkeleton() {
 // Page
 // ─────────────────────────────────────────────────────────────────────────────
 
-export default function SellerOrdersPage() {
+export default function WarehouseOrdersPage() {
   const router = useRouter();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasWarehouse, setHasWarehouse] = useState(true);
   const [results, setResults] = useState<EnrichedResult[]>([]);
   const [allocatedData, setAllocatedData] = useState<{ orders: any[], orderItems: any[] } | null>(null);
   const [confirming, setConfirming] = useState<Record<string, boolean>>({});
   const [outcomeFilter, setOutcomeFilter] = useState<"ALL" | "ASSIGN" | "SPLIT" | "HOLD">("ALL");
 
-  // ── Pipeline ────────────────────────────────────────────────────────────────
   const runPipeline = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const user = await SellerService.getUser();
-      if (!user) { router.push("/seller/login"); return; }
+      const user = await WarehouseManagerService.getUser();
+      if (!user) { router.push("/warehouse/login"); return; }
 
-      const warehouse = await WarehouseService.getBySeller(user.id);
-      if (!warehouse) { setError("No warehouse found. Set up your warehouse first."); return; }
+      const warehouse = await WarehouseService.getByManager(user.id);
+      if (!warehouse) { setHasWarehouse(false); return; }
+      setHasWarehouse(true);
 
       const { orders, orderItems, drones, productsById, dronesById } =
         await SellerService.getOrderDashboardData(warehouse.id);
@@ -568,20 +556,16 @@ export default function SellerOrdersPage() {
       const allocatedDataResult = await SellerService.getAllocatedOrdersDashboardData(warehouse.id);
       setAllocatedData(allocatedDataResult);
 
-      // 1. Priority Queue (unchanged)
       const pendingOrders = (orders as PendingOrderRow[]).filter((o) => o.status === "pending");
       const prioritized = prioritizePendingOrders(pendingOrders);
 
-      // 2. Decision Tree → Knapsack (unchanged)
       const rawResults = runDroneKnapsackAssignment(
         prioritized as FullOrderRow[],
         orderItems as FullOrderItemRow[],
         drones as FullDroneRow[],
       );
 
-      // 3. Enrich for display — attach order row, product map, drone map, and raw items
       const ordersById = new Map((orders as FullOrderRow[]).map((o) => [o.id, o]));
-      // Group raw items by order_id for quick lookup
       const rawItemsByOrderId = new Map<string, typeof orderItems>();
       for (const item of orderItems as any[]) {
         const list = rawItemsByOrderId.get(item.order_id) ?? [];
@@ -606,7 +590,7 @@ export default function SellerOrdersPage() {
       setResults(enriched);
     } catch (err: any) {
       setError(err?.message ?? "Failed to load orders");
-      console.error("[Orders] Pipeline error:", err);
+      console.error("[Warehouse Orders] Pipeline error:", err);
     } finally {
       setLoading(false);
     }
@@ -614,7 +598,6 @@ export default function SellerOrdersPage() {
 
   useEffect(() => { runPipeline(); }, [runPipeline]);
 
-  // ── Confirm assignment ───────────────────────────────────────────────────────
   const handleConfirm = async (orderId: string, droneId: string) => {
     if (confirming[orderId]) return;
     setConfirming((prev) => ({ ...prev, [orderId]: true }));
@@ -654,6 +637,19 @@ export default function SellerOrdersPage() {
     return map;
   }, [allocatedData]);
 
+  if (!loading && !hasWarehouse) {
+    return (
+      <div>
+        <PageHeader title="Order Assignment Queue" description="Waiting for an admin to assign you a warehouse." />
+        <EmptyState
+          icon={WarehouseIcon}
+          title="No warehouse assigned yet"
+          description="Once an admin assigns you to a warehouse, its orders will show up here."
+        />
+      </div>
+    );
+  }
+
   return (
     <div>
       <PageHeader
@@ -669,7 +665,6 @@ export default function SellerOrdersPage() {
         }
       />
 
-      {/* Filter tabs */}
       <div className="mb-5 flex flex-wrap gap-2">
         {(["ALL", "ASSIGN", "SPLIT", "HOLD"] as const).map((f) => (
           <button
@@ -711,7 +706,6 @@ export default function SellerOrdersPage() {
         </div>
       )}
 
-      {/* ── Allocated Orders Section ─────────────────────────────────────────── */}
       <div className="mt-12">
         <PageHeader
           title="Allocated Orders"

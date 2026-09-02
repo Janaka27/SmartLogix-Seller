@@ -79,7 +79,7 @@ export const SellerService = {
 
   async logout() {
     const { error } = await supabase.auth.signOut();
-    
+
     if (error) {
       console.error('Error logging out:', error.message);
       throw new Error(error.message);
@@ -88,12 +88,12 @@ export const SellerService = {
 
   async getSession() {
     const { data, error } = await supabase.auth.getSession();
-    
+
     if (error) {
       console.error('Error getting session:', error.message);
       throw new Error(error.message);
     }
-    
+
     return data.session;
   },
 
@@ -247,6 +247,183 @@ export const SellerService = {
     })) as unknown as Seller[];
   },
 
+  // Orders dashboard: fetch all columns needed by the Priority Queue →
+  // Decision Tree → Knapsack pipeline, plus product details for UI display.
+  async getOrderDashboardData(warehouseId: string) {
+    // 1️⃣  Orders for this warehouse (weight + volume + distance for knapsack)
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select('id, warehouse_id, status, created_at, is_urgent, total_weight_kg, total_volume_cm3, distance_km')
+      .eq('warehouse_id', warehouseId)
+      .order('created_at', { ascending: false });
+
+    if (ordersError) {
+      console.error('Error fetching orders:', ordersError.message);
+      throw new Error(ordersError.message);
+    }
+
+    const orderIds = (ordersData ?? []).map((o: any) => o.id);
+
+    // 2️⃣  Order items with nested product details in a single round-trip.
+    //      weight_kg / volume_cm3 on order_items are the delivery-algorithm values;
+    //      the nested product fields are display-only.
+    let itemsData: any[] = [];
+    let productsById: Record<string, any> = {};
+
+    if (orderIds.length > 0) {
+      const { data, error: itemsError } = await supabase
+        .from('order_items')
+        .select(`
+          id,
+          order_id,
+          product_id,
+          quantity,
+          weight_kg,
+          volume_cm3,
+          product:products!order_items_product_id_fkey (
+            id,
+            name,
+            category,
+            price,
+            weight_kg,
+            length_cm,
+            width_cm,
+            height_cm,
+            volume_cm3,
+            fragile,
+            images
+          )
+        `)
+        .in('order_id', orderIds);
+
+      if (itemsError) {
+        console.error('Error fetching order items:', itemsError.message);
+        throw new Error(itemsError.message);
+      }
+
+      itemsData = (data ?? []).map((row: any) => {
+        // Keep product as a sidecar so the algorithm types stay clean
+        const { product, ...rest } = row;
+        if (product) productsById[product.id] = product;
+        return rest;
+      });
+    }
+
+    // 3️⃣  Drones — algorithm fields + display fields (drone_code, model, battery, speed).
+    //      FullDroneRow (used by knapsack) only needs the algorithm columns;
+    //      extra display columns are peeled off into a dronesById map.
+    const { data: dronesData, error: dronesError } = await supabase
+      .from('drones')
+      .select('id, drone_code, model, max_payload_kg, cargo_bay_volume_cm3, max_range_km, battery_capacity_pct, speed_kmh, status, home_warehouse_id')
+      .eq('home_warehouse_id', warehouseId);
+
+    if (dronesError) {
+      console.error('Error fetching drones:', dronesError.message);
+      throw new Error(dronesError.message);
+    }
+
+    // Build a display-only map; strip extra fields before passing to algorithm
+    const dronesById: Record<string, any> = {};
+    const algorithmDrones = (dronesData ?? []).map((d: any) => {
+      dronesById[d.id] = d;
+      // Return only the fields FullDroneRow expects
+      return {
+        id: d.id,
+        max_payload_kg: d.max_payload_kg,
+        cargo_bay_volume_cm3: d.cargo_bay_volume_cm3,
+        max_range_km: d.max_range_km,
+        status: d.status,
+        home_warehouse_id: d.home_warehouse_id,
+      };
+    });
+
+    return {
+      orders: ordersData ?? [],
+      orderItems: itemsData,   // algorithm-safe (no product sidecar)
+      drones: algorithmDrones, // algorithm-safe subset
+      productsById,            // display-only product lookup map
+      dronesById,              // display-only drone lookup map
+    };
+  },
+
+  // Fetch allocated orders for the dashboard, including their drone assignments and items.
+  async getAllocatedOrdersDashboardData(warehouseId: string) {
+    const { data: ordersData, error: ordersError } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        warehouse_id,
+        status,
+        created_at,
+        is_urgent,
+        total_amount,
+        total_weight_kg,
+        total_volume_cm3,
+        delivery_address,
+        distance_km,
+        drone_assignment:drone_assignments (
+          id,
+          status,
+          drone:drones (
+            id,
+            drone_code,
+            status,
+            max_payload_kg,
+            max_range_km
+          )
+        )
+      `)
+      .eq('warehouse_id', warehouseId)
+      .eq('status', 'allocated')
+      .order('created_at', { ascending: false });
+
+    if (ordersError) {
+      console.error('Error fetching allocated orders:', ordersError.message);
+      throw new Error(ordersError.message);
+    }
+
+    const orderIds = (ordersData ?? []).map((o: any) => o.id);
+
+    let itemsData: any[] = [];
+    if (orderIds.length > 0) {
+      const { data, error: itemsError } = await supabase
+        .from('order_items')
+        .select(`
+          id,
+          order_id,
+          product_id,
+          quantity,
+          weight_kg,
+          volume_cm3,
+          product:products (
+            id,
+            name,
+            category,
+            price,
+            weight_kg,
+            length_cm,
+            width_cm,
+            height_cm,
+            volume_cm3,
+            fragile,
+            images
+          )
+        `)
+        .in('order_id', orderIds);
+
+      if (itemsError) {
+        console.error('Error fetching allocated order items:', itemsError.message);
+        throw new Error(itemsError.message);
+      }
+      itemsData = data ?? [];
+    }
+
+    return {
+      orders: ordersData ?? [],
+      orderItems: itemsData
+    };
+  },
+
   // Admin-only: approve / reject / suspend / reinstate a seller.
   async updateSellerStatus(sellerId: string, status: SellerStatus) {
     const { data, error } = await supabase
@@ -262,5 +439,13 @@ export const SellerService = {
     }
 
     return data;
-  }
+  },
+
+  // Confirm a drone assignment made by the knapsack algorithm:
+  //   • order.status           → 'allocated'
+  //   • order.drone_assignment_id → droneId
+  async confirmAssignment(orderId: string, droneId: string): Promise<void> {
+    const { confirmAssignmentAdmin } = await import('@/server/actions/assignments');
+    await confirmAssignmentAdmin(orderId, droneId);
+  },
 };

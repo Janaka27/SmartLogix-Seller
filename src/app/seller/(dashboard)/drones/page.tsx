@@ -155,12 +155,12 @@ export default function SellerDronesPage() {
             prev.map((r) =>
               r.id === row.id
                 ? {
-                    ...r,
-                    status: row.status,
-                    adminNotes: row.admin_notes ?? undefined,
-                    updatedAt: row.updated_at,
-                    reviewedAt: row.reviewed_at ?? undefined,
-                  }
+                  ...r,
+                  status: row.status,
+                  adminNotes: row.admin_notes ?? undefined,
+                  updatedAt: row.updated_at,
+                  reviewedAt: row.reviewed_at ?? undefined,
+                }
                 : r
             )
           );

@@ -19,10 +19,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { WarehouseFormDialog } from "@/components/admin/WarehouseFormDialog";
+import { WarehouseFormDialog, type WarehouseManagerOption } from "@/components/admin/WarehouseFormDialog";
 import { LocationDialog } from "@/components/dashboard/LocationDialog";
 import { LocationsMap } from "@/components/dashboard/LocationsMap";
 import { WarehouseService } from "@/server/services/warehouse.service";
+import { AdminService } from "@/server/services/admin.service";
 import { formatCoordinates } from "@/lib/format";
 import type { Warehouse } from "@/lib/types";
 
@@ -30,6 +31,7 @@ type AdminWarehouse = Warehouse & { activeDroneCount?: number };
 
 export default function AdminWarehousesPage() {
   const [warehouses, setWarehouses] = useState<AdminWarehouse[]>([]);
+  const [managers, setManagers] = useState<WarehouseManagerOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -37,14 +39,23 @@ export default function AdminWarehousesPage() {
   const [mapWarehouse, setMapWarehouse] = useState<AdminWarehouse | null>(null);
 
   useEffect(() => {
-    WarehouseService.getAll()
-      .then((data) => setWarehouses(data as unknown as AdminWarehouse[]))
+    Promise.all([WarehouseService.getAll(), AdminService.getAllUsers()])
+      .then(([warehouseData, users]) => {
+        setWarehouses(warehouseData as unknown as AdminWarehouse[]);
+        setManagers(
+          (users as { id: string; name: string; role: string }[])
+            .filter((u) => u.role === "warehouse_manager")
+            .map((u) => ({ id: u.id, name: u.name }))
+        );
+      })
       .catch((err) => {
         console.error("Failed to load warehouses", err);
         toast.error("Failed to load warehouses");
       })
       .finally(() => setLoading(false));
   }, []);
+
+  const managerName = (id?: string) => managers.find((m) => m.id === id)?.name;
 
   const filtered = useMemo(
     () => warehouses.filter((w) => w.name.toLowerCase().includes(search.toLowerCase())),
@@ -126,6 +137,7 @@ export default function AdminWarehousesPage() {
                       <TableHead>Capacity</TableHead>
                       <TableHead>Drone Docks</TableHead>
                       <TableHead>Active Drones</TableHead>
+                      <TableHead>Manager</TableHead>
                       <TableHead>Charging</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -152,6 +164,11 @@ export default function AdminWarehousesPage() {
                           <TableCell>{warehouse.capacity.toLocaleString()}</TableCell>
                           <TableCell>{warehouse.droneDockCount}</TableCell>
                           <TableCell>{warehouse.activeDroneCount ?? 0}</TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {managerName(warehouse.managerId) ?? (
+                              <span className="text-xs">Unassigned</span>
+                            )}
+                          </TableCell>
                           <TableCell>
                             {warehouse.chargingStation ? (
                               <Badge variant="secondary" className="border-0 bg-orange-50 text-orange-700">
@@ -201,6 +218,7 @@ export default function AdminWarehousesPage() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         warehouse={editing}
+        managers={managers}
         onSave={handleSave}
       />
 

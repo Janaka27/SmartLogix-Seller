@@ -61,6 +61,7 @@ export interface Warehouse {
   capacity: number;
   droneDockCount: number;
   chargingStation: boolean;
+  managerId?: string;
 }
 
 export type DroneStatus = "available" | "in_flight" | "charging" | "maintenance";

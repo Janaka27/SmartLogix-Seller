@@ -13,6 +13,7 @@ export interface WarehouseInput {
     chargingStation?: boolean;
     sellerFacing?: boolean;
     sellerId?: string;
+    managerId?: string;
 }
 
 // Convert DB snake_case to UI camelCase
@@ -29,6 +30,7 @@ function mapToFrontend(dbWarehouse: any) {
         droneDockCount: dbWarehouse.drone_dock_count,
         chargingStation: dbWarehouse.charging_station,
         sellerId: dbWarehouse.seller_id,
+        managerId: dbWarehouse.manager_id ?? undefined,
         createdAt: dbWarehouse.created_at,
         activeDroneCount: Array.isArray(dbWarehouse.drones) ? dbWarehouse.drones.length : undefined,
     };
@@ -82,6 +84,24 @@ export const WarehouseService = {
         return (data || []).map(mapToFrontend);
     },
 
+    // A warehouse manager runs exactly one warehouse — returns the one
+    // (oldest, if an admin ever assigns more than one) they're linked to.
+    async getByManager(managerId: string) {
+        const { data, error } = await supabase
+            .from('warehouses')
+            .select('*')
+            .eq('manager_id', managerId)
+            .order('created_at', { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+        if (error) {
+            console.error('Error fetching managed warehouse:', error.message);
+            throw new Error(error.message);
+        }
+        return mapToFrontend(data);
+    },
+
     async create(warehouseData: WarehouseInput) {
         const dbInput = {
             name: warehouseData.name,
@@ -90,6 +110,7 @@ export const WarehouseService = {
             longitude: warehouseData.longitude,
             capacity: warehouseData.capacity,
             seller_id: warehouseData.sellerId,
+            manager_id: warehouseData.managerId || null,
             is_seller_facing: warehouseData.sellerFacing ?? true,
             drone_dock_count: warehouseData.droneDockCount ?? 0,
             charging_station: warehouseData.chargingStation ?? false,
@@ -120,6 +141,7 @@ export const WarehouseService = {
         if (updates.droneDockCount !== undefined) dbInput.drone_dock_count = updates.droneDockCount;
         if (updates.chargingStation !== undefined) dbInput.charging_station = updates.chargingStation;
         if (updates.sellerFacing !== undefined) dbInput.is_seller_facing = updates.sellerFacing;
+        if (updates.managerId !== undefined) dbInput.manager_id = updates.managerId || null;
 
         const { data, error } = await supabase
             .from('warehouses')
@@ -134,5 +156,19 @@ export const WarehouseService = {
         }
 
         return mapToFrontend(data);
+    },
+
+    async getWarehouseStats(sellerId: string) {
+        const { data, error } = await supabase
+            .rpc('get_warehouse_stock', {
+                p_seller_id: sellerId
+            });
+
+        if (error) {
+            console.error(error);
+            return;
+        }
+
+        console.log(data);
     }
 };
