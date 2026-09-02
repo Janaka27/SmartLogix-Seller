@@ -18,7 +18,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type { Warehouse } from "@/lib/types";
+
+const NO_MANAGER = "__none__";
 
 const warehouseSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -29,14 +38,21 @@ const warehouseSchema = z.object({
   droneDockCount: z.coerce.number().int().min(0, "Can't be negative"),
   chargingStation: z.boolean(),
   sellerFacing: z.boolean(),
+  managerId: z.string(),
 });
 
 type WarehouseFormValues = z.infer<typeof warehouseSchema>;
+
+export interface WarehouseManagerOption {
+  id: string;
+  name: string;
+}
 
 interface WarehouseFormDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   warehouse?: Warehouse | null;
+  managers?: WarehouseManagerOption[];
   onSave: (values: WarehouseFormValues) => void;
 }
 
@@ -49,9 +65,10 @@ const EMPTY_VALUES: WarehouseFormValues = {
   droneDockCount: 2,
   chargingStation: false,
   sellerFacing: true,
+  managerId: "",
 };
 
-export function WarehouseFormDialog({ open, onOpenChange, warehouse, onSave }: WarehouseFormDialogProps) {
+export function WarehouseFormDialog({ open, onOpenChange, warehouse, managers = [], onSave }: WarehouseFormDialogProps) {
   const {
     register,
     handleSubmit,
@@ -65,7 +82,11 @@ export function WarehouseFormDialog({ open, onOpenChange, warehouse, onSave }: W
 
   useEffect(() => {
     if (open) {
-      reset(warehouse ? { ...warehouse } : EMPTY_VALUES);
+      reset(
+        warehouse
+          ? { ...EMPTY_VALUES, ...warehouse, managerId: warehouse.managerId ?? "" }
+          : EMPTY_VALUES
+      );
     }
   }, [open, warehouse, reset]);
 
@@ -116,6 +137,33 @@ export function WarehouseFormDialog({ open, onOpenChange, warehouse, onSave }: W
               <Label htmlFor="droneDockCount">Drone docks</Label>
               <Input id="droneDockCount" type="number" {...register("droneDockCount")} />
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="managerId">Warehouse manager</Label>
+            <Controller
+              name="managerId"
+              control={control}
+              render={({ field }) => (
+                <Select
+                  value={field.value || NO_MANAGER}
+                  onValueChange={(v) => field.onChange(v === NO_MANAGER ? "" : v)}
+                >
+                  <SelectTrigger id="managerId" className="w-full">
+                    <SelectValue placeholder="Unassigned" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NO_MANAGER}>Unassigned</SelectItem>
+                    {managers.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            />
+            <p className="text-xs text-muted-foreground">Who can manage drones, orders, and inventory here.</p>
           </div>
 
           <div className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">

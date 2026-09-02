@@ -7,6 +7,7 @@ import {
   Wallet,
   Store,
   Users,
+  UserCog,
   Drone as DroneIcon,
   Network,
   Route,
@@ -35,8 +36,22 @@ export const sellerNavGroups: NavGroup[] = [
       { title: "Inventory", href: "/seller/inventory", icon: Package },
       { title: "Orders", href: "/seller/orders", icon: ClipboardList },
       { title: "Drone Fleet", href: "/seller/drones", icon: DroneIcon },
+      { title: "Warehouse Manager", href: "/seller/manager", icon: UserCog },
       { title: "Earnings", href: "/seller/earnings", icon: Wallet },
       { title: "Store Settings", href: "/seller/settings", icon: Store },
+    ],
+  },
+];
+
+export const warehouseNavGroups: NavGroup[] = [
+  {
+    label: "Workspace",
+    items: [
+      { title: "Dashboard", href: "/warehouse", icon: LayoutDashboard },
+      { title: "Inventory", href: "/warehouse/inventory", icon: Package },
+      { title: "Orders", href: "/warehouse/orders", icon: ClipboardList },
+      { title: "Drone Fleet", href: "/warehouse/drones", icon: DroneIcon },
+      { title: "Settings", href: "/warehouse/settings", icon: Warehouse },
     ],
   },
 ];
@@ -78,4 +93,5 @@ export const adminNavGroups: NavGroup[] = [
 export const roleBadge = {
   seller: { label: "Seller", className: "bg-slate-800 text-white" },
   admin: { label: "Admin", className: "bg-orange-500 text-white" },
+  warehouse: { label: "Warehouse", className: "bg-blue-600 text-white" },
 };

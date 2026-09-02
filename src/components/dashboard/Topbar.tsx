@@ -27,13 +27,38 @@ import {
 import { AdminNotificationBell } from "@/components/admin/AdminNotificationBell";
 
 interface TopbarProps {
-  role: "seller" | "admin";
+  role: "seller" | "admin" | "warehouse";
 }
 
 import { useEffect, useState } from "react";
 import { SellerService } from "@/server/services/seller.service";
 import { AdminService } from "@/server/services/admin.service";
+import { WarehouseManagerService } from "@/server/services/warehouse-manager.service";
 import { createClient } from "@/lib/supabase";
+
+const ROLE_SERVICE = {
+  seller: SellerService,
+  admin: AdminService,
+  warehouse: WarehouseManagerService,
+};
+
+const ROLE_ROOT_LABEL = {
+  seller: "Seller Portal",
+  admin: "Admin Panel",
+  warehouse: "Warehouse Portal",
+};
+
+const ROLE_ROOT_HREF = {
+  seller: "/seller",
+  admin: "/admin",
+  warehouse: "/warehouse",
+};
+
+const ROLE_LOGIN = {
+  seller: "/seller/login",
+  admin: "/admin/login",
+  warehouse: "/warehouse/login",
+};
 
 const SEGMENT_OVERRIDES: Record<string, string> = { cms: "CMS" };
 
@@ -47,20 +72,20 @@ function titleCase(segment: string) {
 export function Topbar({ role }: TopbarProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const rootLabel = role === "seller" ? "Seller Portal" : "Admin Panel";
-  const rootHref = role === "seller" ? "/seller" : "/admin";
+  const rootLabel = ROLE_ROOT_LABEL[role];
+  const rootHref = ROLE_ROOT_HREF[role];
 
-  const [userInitials, setUserInitials] = useState(role === "seller" ? "JT" : "PS");
+  const [userInitials, setUserInitials] = useState(role === "seller" ? "JT" : role === "admin" ? "PS" : "WM");
 
   useEffect(() => {
     const fetchUser = async () => {
       try {
-        const service = role === "seller" ? SellerService : AdminService;
+        const service = ROLE_SERVICE[role];
         const authUser = await service.getUser();
         if (authUser) {
           const supabase = createClient();
           const { data } = await supabase.from('profiles').select('full_name').eq('id', authUser.id).single();
-          const defaultName = role === "seller" ? "Seller" : "Admin";
+          const defaultName = role === "seller" ? "Seller" : role === "admin" ? "Admin" : "Warehouse Manager";
           const name = data?.full_name || authUser.email?.split('@')[0] || defaultName;
           setUserInitials(name.substring(0, 2).toUpperCase());
         }
@@ -140,12 +165,11 @@ export function Topbar({ role }: TopbarProps) {
             <DropdownMenuItem
               onClick={async () => {
                 try {
-                  const service = role === "seller" ? SellerService : AdminService;
-                  await service.logout();
+                  await ROLE_SERVICE[role].logout();
                 } catch (e) {
                   console.error("Failed to log out:", e);
                 }
-                router.push(role === "seller" ? "/seller/login" : "/admin/login");
+                router.push(ROLE_LOGIN[role]);
               }}
             >
               <LogOut /> Log out

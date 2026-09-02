@@ -28,7 +28,7 @@ import {
 import { AdminService, isUnauthorizedError } from "@/server/services/admin.service";
 import { formatDate } from "@/lib/format";
 
-type PlatformRole = "buyer" | "seller" | "admin";
+type PlatformRole = "buyer" | "seller" | "admin" | "warehouse_manager";
 
 interface PlatformUser {
   id: string;
@@ -44,12 +44,14 @@ const ROLE_LABELS: Record<PlatformRole, string> = {
   admin: "Admin",
   seller: "Seller",
   buyer: "Buyer",
+  warehouse_manager: "Warehouse Manager",
 };
 
 const ROLE_BADGE_CLASSES: Record<PlatformRole, string> = {
   admin: "bg-blue-50 text-blue-700",
   seller: "bg-orange-50 text-orange-700",
   buyer: "bg-slate-100 text-slate-700",
+  warehouse_manager: "bg-purple-50 text-purple-700",
 };
 
 function initials(name: string) {
@@ -108,6 +110,7 @@ export default function AdminUsersPage() {
               <SelectItem value="all">All roles</SelectItem>
               <SelectItem value="admin">Admin</SelectItem>
               <SelectItem value="seller">Seller</SelectItem>
+              <SelectItem value="warehouse_manager">Warehouse Manager</SelectItem>
               <SelectItem value="buyer">Buyer</SelectItem>
             </SelectContent>
           </Select>

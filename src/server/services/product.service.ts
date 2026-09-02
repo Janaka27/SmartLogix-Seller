@@ -79,6 +79,24 @@ export const ProductService = {
         return (data || []).map(mapToFrontend);
     },
 
+    // Warehouse-manager-facing: every product physically stored in one
+    // warehouse, across all sellers — RLS scopes this to warehouses the
+    // caller manages. Seller identity isn't included: a manager's products
+    // RLS grant doesn't extend to reading other sellers' profile rows.
+    async getProductsByWarehouse(warehouseId: string) {
+        const { data, error } = await supabase
+            .from('products')
+            .select('*')
+            .eq('warehouse_id', warehouseId)
+            .order('name', { ascending: true });
+
+        if (error) {
+            console.error('Error fetching warehouse products:', error.message);
+            throw new Error(error.message);
+        }
+        return (data || []).map(mapToFrontend);
+    },
+
     async createProduct(productData: ProductInput) {
         // Map frontend camelCase to DB snake_case. Skip volumeCm3.
         const dbInput = {
