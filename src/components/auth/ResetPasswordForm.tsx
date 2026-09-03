@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -9,15 +9,11 @@ import { toast } from "sonner";
 import { AlertCircle, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
-import { WarehouseManagerService } from "@/server/services/warehouse-manager.service";
-import { createClient } from "@/lib/supabase";
 
-const setupSchema = z
+const resetPasswordSchema = z
   .object({
-    fullName: z.string().min(2, "Full name is required"),
     password: z.string().min(8, "Password must be at least 8 characters"),
     confirmPassword: z.string().min(1, "Please confirm your password"),
   })
@@ -26,9 +22,24 @@ const setupSchema = z
     path: ["confirmPassword"],
   });
 
-type SetupValues = z.infer<typeof setupSchema>;
+type ResetPasswordValues = z.infer<typeof resetPasswordSchema>;
 
-function AcceptInviteForm() {
+interface ResetPasswordFormProps {
+  loginHref: string;
+  /** Where to send the user once their password is set — usually the portal's dashboard root. */
+  redirectHref: string;
+  verifyToken: (tokenHash: string, type: string) => Promise<unknown>;
+  hasSession: () => Promise<boolean>;
+  updatePassword: (password: string) => Promise<void>;
+}
+
+export function ResetPasswordForm({
+  loginHref,
+  redirectHref,
+  verifyToken,
+  hasSession,
+  updatePassword,
+}: ResetPasswordFormProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [checking, setChecking] = useState(true);
@@ -37,11 +48,10 @@ function AcceptInviteForm() {
   const {
     register,
     handleSubmit,
-    reset,
     formState: { errors, isSubmitting },
-  } = useForm<SetupValues>({
-    resolver: zodResolver(setupSchema),
-    defaultValues: { fullName: "", password: "", confirmPassword: "" },
+  } = useForm<ResetPasswordValues>({
+    resolver: zodResolver(resetPasswordSchema),
+    defaultValues: { password: "", confirmPassword: "" },
   });
 
   useEffect(() => {
@@ -51,29 +61,19 @@ function AcceptInviteForm() {
 
       if (tokenHash && type) {
         try {
-          await WarehouseManagerService.verifyInviteToken(tokenHash, type);
+          await verifyToken(tokenHash, type);
         } catch (err) {
           // The token may already be consumed — e.g. React Strict Mode
           // double-invokes this effect in dev, and the first run already
           // used the (single-use) token. Don't treat that as fatal yet;
           // fall through and check for the session it should have left behind.
-          console.warn("Invite token verification failed, checking for an existing session instead", err);
+          console.warn("Reset token verification failed, checking for an existing session instead", err);
         }
       }
 
       try {
-        const supabase = createClient();
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (!session) {
-          setInvalid(true);
-          return;
-        }
-
-        const inviteName = (session.user.user_metadata?.full_name as string | undefined) ?? "";
-        reset({ fullName: inviteName, password: "", confirmPassword: "" });
+        const ok = await hasSession();
+        setInvalid(!ok);
       } catch (err) {
         console.error("Failed to check session", err);
         setInvalid(true);
@@ -85,16 +85,13 @@ function AcceptInviteForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onSubmit = async (values: SetupValues) => {
+  const onSubmit = async (values: ResetPasswordValues) => {
     try {
-      await WarehouseManagerService.completeInvite({
-        fullName: values.fullName,
-        password: values.password,
-      });
-      toast.success("You're all set!");
-      router.push("/warehouse");
+      await updatePassword(values.password);
+      toast.success("Password updated");
+      router.push(redirectHref);
     } catch (error: any) {
-      toast.error(error.message || "Failed to finish setup. Please try again.");
+      toast.error(error.message || "Failed to reset password. Please try again.");
     }
   };
 
@@ -102,7 +99,7 @@ function AcceptInviteForm() {
     return (
       <div className="flex flex-col items-center gap-3 py-8 text-sm text-muted-foreground">
         <Loader2 className="h-5 w-5 animate-spin" />
-        Verifying your invite…
+        Verifying your link…
       </div>
     );
   }
@@ -114,14 +111,11 @@ function AcceptInviteForm() {
           <AlertCircle className="h-6 w-6" />
         </span>
         <h1 className="mt-4 text-xl font-semibold tracking-tight text-foreground">
-          This invite link is invalid or has expired
+          This reset link is invalid or has expired
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Ask the seller who invited you to send a new one, or sign in below if you&apos;ve already
-          set your password.
-        </p>
-        <Button className="mt-6 w-full" onClick={() => router.push("/warehouse/login")}>
-          Go to sign in
+        <p className="mt-2 text-sm text-muted-foreground">Request a new one and try again.</p>
+        <Button className="mt-6 w-full" onClick={() => router.push(loginHref)}>
+          Back to sign in
         </Button>
       </div>
     );
@@ -129,20 +123,12 @@ function AcceptInviteForm() {
 
   return (
     <div>
-      <h1 className="text-xl font-semibold tracking-tight text-foreground">Set up your account</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        You&apos;ve been invited as a warehouse manager. Confirm your name and choose a password to
-        get started.
-      </p>
+      <h1 className="text-xl font-semibold tracking-tight text-foreground">Choose a new password</h1>
+      <p className="mt-1 text-sm text-muted-foreground">Make it at least 8 characters.</p>
 
       <form className="mt-6 space-y-4" onSubmit={handleSubmit(onSubmit)}>
         <div className="space-y-1.5">
-          <Label htmlFor="fullName">Full name</Label>
-          <Input id="fullName" placeholder="Alex Rivera" {...register("fullName")} />
-          {errors.fullName && <p className="text-xs text-destructive">{errors.fullName.message}</p>}
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password">New password</Label>
           <PasswordInput id="password" placeholder="••••••••" {...register("password")} />
           {errors.password && <p className="text-xs text-destructive">{errors.password.message}</p>}
         </div>
@@ -154,24 +140,9 @@ function AcceptInviteForm() {
           )}
         </div>
         <Button type="submit" className="w-full" disabled={isSubmitting}>
-          {isSubmitting ? "Setting up…" : "Finish setup"}
+          {isSubmitting ? "Saving…" : "Save new password"}
         </Button>
       </form>
     </div>
-  );
-}
-
-export default function WarehouseAcceptInvitePage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex flex-col items-center gap-3 py-8 text-sm text-muted-foreground">
-          <Loader2 className="h-5 w-5 animate-spin" />
-          Loading…
-        </div>
-      }
-    >
-      <AcceptInviteForm />
-    </Suspense>
   );
 }

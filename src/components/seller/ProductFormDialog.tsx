@@ -357,7 +357,7 @@ export function ProductFormDialog({
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="price">Price (USD)</Label>
+              <Label htmlFor="price">Price (LKR)</Label>
               <Input id="price" type="number" step="0.01" {...register("price")} />
               {errors.price && <p className="text-xs text-destructive">{errors.price.message}</p>}
             </div>

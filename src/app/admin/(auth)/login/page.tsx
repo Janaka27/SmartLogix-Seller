@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -60,7 +61,12 @@ export default function AdminLoginPage() {
           {errors.email && <p className="text-xs text-destructive">{errors.email.message}</p>}
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="password">Password</Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password">Password</Label>
+            <Link href="/admin/forgot-password" className="text-xs font-medium text-orange-600 hover:underline">
+              Forgot password?
+            </Link>
+          </div>
           <PasswordInput id="password" placeholder="••••••••" {...register("password")} />
           {errors.password && (
             <p className="text-xs text-destructive">{errors.password.message}</p>
