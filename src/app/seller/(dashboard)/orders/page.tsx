@@ -33,6 +33,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 import { SellerService } from "@/server/services/seller.service";
 import { WarehouseService } from "@/server/services/warehouse.service";
@@ -55,6 +56,8 @@ import {
 } from "@/lib/format";
 import { haversineDistanceKm, interpolatePosition, bearingDegrees } from "@/lib/geo";
 import { TrackingMap } from "@/components/seller/TrackingMap";
+import { PathTrackingMap } from "@/components/seller/PathTrackingMap";
+import { getRoute } from "@/lib/algorithms/seller-dijkstra";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -453,16 +456,20 @@ function AllocatedOrderCard({
   order,
   items,
   warehouse,
+  allWarehouses,
   onDelivered,
 }: {
   order: any;
   items: any[];
-  warehouse: { latitude: number; longitude: number; name: string } | null;
+  warehouse: { id: string; latitude: number; longitude: number; name: string } | null;
+  allWarehouses: any[];
   onDelivered: (orderId: string) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [now, setNow] = useState(() => Date.now());
   const [markingDelivered, setMarkingDelivered] = useState(false);
+  const [showPathMap, setShowPathMap] = useState(false);
+  const [calculatedRoute, setCalculatedRoute] = useState<any>(null);
   const deliveredFiredRef = useRef(false);
   const shortId = order.id.slice(0, 8).toUpperCase();
   const assignment = order.drone_assignment;
@@ -510,14 +517,18 @@ function AllocatedOrderCard({
   useEffect(() => {
     if (!flight || flight.progress < 1 || alreadyDelivered || deliveredFiredRef.current) return;
     deliveredFiredRef.current = true;
-    SellerService.deliverAssignment(order.id, assignment.id, drone.id)
-      .then(() => {
-        toast.success(`Order ${shortId} delivered.`);
-        onDelivered(order.id);
-      })
-      .catch(() => {
-        deliveredFiredRef.current = false;
-      });
+    // DEVELOPMENT MODE: Disabled delivery API call for testing map
+    // SellerService.deliverAssignment(order.id, assignment.id, drone.id)
+    //   .then(() => {
+    //     toast.success(`Order ${shortId} delivered.`);
+    //     onDelivered(order.id);
+    //   })
+    //   .catch(() => {
+    //     deliveredFiredRef.current = false;
+    //   });
+    
+    console.log(`[TEST MODE] Auto-deliver triggered for order ${shortId}`);
+
     // Depends on flight.progress (not the flight object, which is a new
     // reference every tick) so this only re-evaluates when progress crosses
     // the completion threshold.
@@ -528,16 +539,36 @@ function AllocatedOrderCard({
     if (!assignment || !drone || markingDelivered) return;
     setMarkingDelivered(true);
     try {
-      await SellerService.deliverAssignment(order.id, assignment.id, drone.id);
-      deliveredFiredRef.current = true;
-      toast.success("Order marked delivered.");
-      onDelivered(order.id);
+      // DEVELOPMENT MODE: Disabled delivery API call for testing map
+      // await SellerService.deliverAssignment(order.id, assignment.id, drone.id);
+      // deliveredFiredRef.current = true;
+      // toast.success("Order marked delivered.");
+      // onDelivered(order.id);
+      
+      console.log(`[TEST MODE] Manual deliver triggered for order ${order.id}`);
+      toast.info("Test Mode: Delivery API call disabled.");
     } catch (err: any) {
       toast.error(err?.message ?? "Failed to mark delivered");
     } finally {
       setMarkingDelivered(false);
     }
   };
+
+  const handleFindPath = () => {
+    if (!warehouse || !destination) return;
+    const route = getRoute(allWarehouses, warehouse.id, destination);
+    setCalculatedRoute(route);
+    setShowPathMap(true);
+  };
+
+  const { routePoints, otherWarehousesPoints } = useMemo(() => {
+    if (!calculatedRoute) return { routePoints: [], otherWarehousesPoints: [] };
+    const routePoints = calculatedRoute.path.map((n: any) => ({ lat: n.lat, lng: n.lng, label: n.name || "Waypoint" }));
+    const otherWarehousesPoints = allWarehouses
+      .filter((w: any) => !calculatedRoute.path.some((p: any) => p.id === w.id))
+      .map((w: any) => ({ lat: w.latitude, lng: w.longitude, label: w.name }));
+    return { routePoints, otherWarehousesPoints };
+  }, [calculatedRoute, allWarehouses]);
 
   return (
     <Card className="overflow-hidden bg-card transition-all hover:shadow-sm">
@@ -562,9 +593,16 @@ function AllocatedOrderCard({
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(order.created_at)}</p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
-          {expanded ? "Hide Details" : "View Details"}
-        </Button>
+        <div className="flex items-center gap-2">
+          {canTrack && !isDeliveredLocally && (
+            <Button size="sm" variant="outline" onClick={handleFindPath}>
+              Find Path
+            </Button>
+          )}
+          <Button variant="ghost" size="sm" onClick={() => setExpanded(!expanded)}>
+            {expanded ? "Hide Details" : "View Details"}
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border px-5 py-3">
@@ -629,21 +667,6 @@ function AllocatedOrderCard({
                 <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                   Live Tracking
                 </h4>
-                {!isDeliveredLocally && (
-                  <Button size="sm" variant="outline" disabled={markingDelivered} onClick={handleMarkDelivered}>
-                    {markingDelivered ? (
-                      <>
-                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-                        Marking…
-                      </>
-                    ) : (
-                      <>
-                        <PackageCheck className="mr-1.5 h-3.5 w-3.5" />
-                        Mark Delivered
-                      </>
-                    )}
-                  </Button>
-                )}
               </div>
 
               <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
@@ -729,6 +752,44 @@ function AllocatedOrderCard({
           )}
         </>
       )}
+
+      <Dialog open={showPathMap} onOpenChange={setShowPathMap}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Optimal Flight Path</DialogTitle>
+          </DialogHeader>
+          {calculatedRoute && (
+            <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr] mt-4">
+              <div className="overflow-hidden rounded-lg border border-border">
+                <PathTrackingMap
+                  routePoints={routePoints}
+                  otherWarehouses={otherWarehousesPoints}
+                  className="h-80 w-full"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3 content-start">
+                <div className="rounded-lg border border-border bg-card p-3 col-span-2 text-center">
+                  <Button size="sm" variant="default" disabled={markingDelivered} onClick={handleMarkDelivered} className="w-full h-12 text-md">
+                    {markingDelivered ? (
+                      <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Confirming…</>
+                    ) : (
+                      <><PackageCheck className="mr-2 h-4 w-4" />Confirm and Deliver</>
+                    )}
+                  </Button>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3">
+                  <p className="text-xs text-muted-foreground">Total Distance</p>
+                  <p className="text-lg font-semibold">{formatDistance(calculatedRoute.distance)}</p>
+                </div>
+                <div className="rounded-lg border border-border bg-card p-3">
+                  <p className="text-xs text-muted-foreground">Corridor</p>
+                  <p className="text-lg font-semibold">{formatDistance(calculatedRoute.corridorDistance)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }
@@ -758,7 +819,8 @@ export default function SellerOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<EnrichedResult[]>([]);
   const [allocatedData, setAllocatedData] = useState<{ orders: any[], orderItems: any[] } | null>(null);
-  const [warehouse, setWarehouse] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
+  const [warehouse, setWarehouse] = useState<{ id: string; latitude: number; longitude: number; name: string } | null>(null);
+  const [allWarehouses, setAllWarehouses] = useState<any[]>([]);
   const [confirming, setConfirming] = useState<Record<string, boolean>>({});
   const [outcomeFilter, setOutcomeFilter] = useState<"ALL" | "ASSIGN" | "SPLIT" | "HOLD">("ALL");
 
@@ -774,11 +836,21 @@ export default function SellerOrdersPage() {
       if (!warehouse) { setError("No warehouse found. Set up your warehouse first."); return; }
       setWarehouse(warehouse);
 
+      const allWs = await WarehouseService.getAll();
+      setAllWarehouses(allWs);
+
       const { orders, orderItems, drones, productsById, dronesById } =
         await SellerService.getOrderDashboardData(warehouse.id);
-
+      
       const allocatedDataResult = await SellerService.getAllocatedOrdersDashboardData(warehouse.id);
       setAllocatedData(allocatedDataResult);
+
+      console.log("Dashboard Data:", { 
+        orders, 
+        orderItems, 
+        drones, 
+        allocatedDataResult 
+      });
 
       // 1. Priority Queue (unchanged)
       const pendingOrders = (orders as PendingOrderRow[]).filter((o) => o.status === "pending");
@@ -960,6 +1032,7 @@ export default function SellerOrdersPage() {
                   order={order}
                   items={allocatedItemsByOrderId.get(order.id) ?? []}
                   warehouse={warehouse}
+                  allWarehouses={allWarehouses}
                   onDelivered={handleDelivered}
                 />
               ))}
