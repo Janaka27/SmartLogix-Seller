@@ -408,7 +408,7 @@ function AllocatedOrderCard({ order, items }: { order: any; items: any[] }) {
       </div>
 
       <div className="flex flex-wrap gap-x-5 gap-y-2 border-t border-border px-5 py-3">
-        <MetaChip icon={DollarSign} label="amount" value={`$${Number(order.total_amount || 0).toFixed(2)}`} />
+        <MetaChip icon={DollarSign} label="amount" value={formatCurrency(Number(order.total_amount || 0))} />
         <MetaChip icon={Weight} label="weight" value={formatWeight(Number(order.total_weight_kg))} />
         <MetaChip icon={Box} label="volume" value={formatVolume(Number(order.total_volume_cm3))} />
         {order.distance_km != null && (
@@ -483,7 +483,7 @@ function AllocatedOrderCard({ order, items }: { order: any; items: any[] }) {
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between">
                         <p className="truncate text-sm font-medium">{item.product?.name ?? "Unknown Product"}</p>
-                        <p className="text-sm font-medium">${item.product?.price ?? 0}</p>
+                        <p className="text-sm font-medium">{formatCurrency(item.product?.price ?? 0)}</p>
                       </div>
                       <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span>Qty: {item.quantity}</span>
