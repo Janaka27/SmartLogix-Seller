@@ -108,12 +108,12 @@ export function dijkstra(
 }
 
 // Build graph by adding all warehouses
-export function buildGraph(warehouses: any[], maxCorridorDistance: number = 50): { nodes: Node[], edges: Edge[] } {
+export function buildGraph(warehouses: any[], maxRange?: number) {
   const nodes: Node[] = warehouses.map(w => ({
     id: w.id,
     lat: w.latitude,
     lng: w.longitude,
-    name: w.name,
+    name: w.name
   }));
 
   const edges: Edge[] = [];
@@ -122,10 +122,13 @@ export function buildGraph(warehouses: any[], maxCorridorDistance: number = 50):
     const distances: { to: string; dist: number; }[] = [];
     for (let j = 0; j < nodes.length; j++) {
       if (i !== j) {
-        distances.push({  
-          to: nodes[j].id,
-          dist: distance(nodes[i].lat, nodes[i].lng, nodes[j].lat, nodes[j].lng)
-        });
+        const dist = distance(nodes[i].lat, nodes[i].lng, nodes[j].lat, nodes[j].lng);
+        if (!maxRange || dist <= maxRange) {
+          distances.push({  
+            to: nodes[j].id,
+            dist
+          });
+        }
       }
     }
     distances.sort((a, b) => a.dist - b.dist);
@@ -145,27 +148,40 @@ export function buildGraph(warehouses: any[], maxCorridorDistance: number = 50):
 }
 
 // Get route from source to drop point
-export function getRoute(warehouses: any[], sourceId: string, dropPoint: { lat: number, lng: number }) {
-  const { nodes, edges } = buildGraph(warehouses);
+export function getRoute(warehouses: any[], sourceId: string, dropPoint: { lat: number, lng: number }, maxRange?: number) {
+  const { nodes, edges } = buildGraph(warehouses, maxRange);
 
   const dropNodeId = "user-drop-point";
   nodes.push({ id: dropNodeId, lat: dropPoint.lat, lng: dropPoint.lng, name: "Delivery point" });
 
-  let nearestDist = Infinity;
-  let nearestWarehouseId = "";
-  for (const w of warehouses) {
-    const dist = distance(dropPoint.lat, dropPoint.lng, w.latitude, w.longitude);
-    if (dist < nearestDist) {
-      nearestDist = dist;
-      nearestWarehouseId = w.id;
+  const sourceNode = nodes.find(n => n.id === sourceId);
+  const directDist = sourceNode ? distance(sourceNode.lat, sourceNode.lng, dropPoint.lat, dropPoint.lng) : Infinity;
+
+  if (sourceNode && (!maxRange || directDist <= maxRange)) {
+    edges.push({
+      from: sourceId,
+      to: dropNodeId,
+      distance: directDist
+    });
+  } else {
+    let nearestDist = Infinity;
+    let nearestWarehouseId = "";
+    for (const w of warehouses) {
+      const dist = distance(dropPoint.lat, dropPoint.lng, w.latitude, w.longitude);
+      if (dist < nearestDist && (!maxRange || dist <= maxRange)) {
+        nearestDist = dist;
+        nearestWarehouseId = w.id;
+      }
+    }
+
+    if (nearestWarehouseId) {
+      edges.push({
+        from: nearestWarehouseId,
+        to: dropNodeId,
+        distance: nearestDist
+      });
     }
   }
-
-  edges.push({
-    from: nearestWarehouseId,
-    to: dropNodeId,
-    distance: nearestDist
-  });
 
   const result = dijkstra(nodes, edges, sourceId, dropNodeId);
   if (!result) return null;

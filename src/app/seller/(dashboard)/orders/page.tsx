@@ -556,7 +556,14 @@ function AllocatedOrderCard({
 
   const handleFindPath = () => {
     if (!warehouse || !destination) return;
-    const route = getRoute(allWarehouses, warehouse.id, destination);
+    const maxRange = drone?.max_range_km ? Number(drone.max_range_km) : undefined;
+    const route = getRoute(allWarehouses, warehouse.id, destination, maxRange);
+    
+    if (!route) {
+      toast.error("No valid route found within the drone's maximum range.");
+      return; // Don't open the modal if no route is found
+    }
+    
     setCalculatedRoute(route);
     setShowPathMap(true);
   };

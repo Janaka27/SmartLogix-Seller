@@ -17,10 +17,11 @@ interface PathTrackingMapProps {
 }
 
 const PIN_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><circle cx="12" cy="10" r="3" stroke="white" stroke-width="2.5"/></svg>`;
+const CHARGING_SVG = `<svg width="10" height="10" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke="white" stroke-width="2" stroke-linejoin="round"/></svg>`;
 
-function pinHtml(label: string | null, bg: string) {
+function pinHtml(label: string | null, bg: string, svg: string = PIN_SVG) {
   return `<div style="display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;font-weight:700;color:#1f2937;filter:drop-shadow(0 1px 2px rgba(0,0,0,.25));transform:translate(-50%,-100%);width:max-content;">
-    <span style="display:flex;height:20px;width:20px;align-items:center;justify-content:center;border-radius:9999px;background:${bg};box-shadow:0 0 0 4px ${bg}33;">${PIN_SVG}</span>
+    <span style="display:flex;height:20px;width:20px;align-items:center;justify-content:center;border-radius:9999px;background:${bg};box-shadow:0 0 0 4px ${bg}33;">${svg}</span>
     ${label ? `<span style="white-space:nowrap;border-radius:4px;background:rgba(255,255,255,.85);padding:1px 4px;">${label}</span>` : ''}
   </div>`;
 }
@@ -65,9 +66,18 @@ export function PathTrackingMap({
 
         // Add markers for all points
         routePoints.forEach((point, i) => {
-          const bg = i === 0 ? "#ea580c" : (i === routePoints.length - 1 ? "#111827" : "#3b82f6");
+          let bg = "#3b82f6";
+          let svg = PIN_SVG;
+          if (i === 0) {
+            bg = "#ea580c";
+          } else if (i === routePoints.length - 1) {
+            bg = "#111827";
+          } else {
+            bg = "#22c55e"; // green for charging warehouse
+            svg = CHARGING_SVG;
+          }
           L.marker([point.lat, point.lng], {
-            icon: L.divIcon({ html: pinHtml(point.label, bg), className: "", iconSize: [0, 0], iconAnchor: [0, 0] }),
+            icon: L.divIcon({ html: pinHtml(point.label, bg, svg), className: "", iconSize: [0, 0], iconAnchor: [0, 0] }),
           }).addTo(map);
         });
 
