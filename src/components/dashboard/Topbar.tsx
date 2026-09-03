@@ -129,9 +129,6 @@ export function Topbar({ role }: TopbarProps) {
       </div>
 
       <div className="flex items-center gap-3">
-        <span className="hidden rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground sm:inline-block">
-          Demo mode — changes aren&apos;t saved
-        </span>
         {role === "admin" ? (
           <AdminNotificationBell />
         ) : (
