@@ -360,16 +360,22 @@ export const SellerService = {
         total_weight_kg,
         total_volume_cm3,
         delivery_address,
+        delivery_lat,
+        delivery_lng,
         distance_km,
         drone_assignment:drone_assignments (
           id,
           status,
+          departed_at,
+          delivered_at,
           drone:drones (
             id,
             drone_code,
             status,
             max_payload_kg,
-            max_range_km
+            max_range_km,
+            speed_kmh,
+            battery_capacity_pct
           )
         )
       `)
@@ -447,5 +453,13 @@ export const SellerService = {
   async confirmAssignment(orderId: string, droneId: string): Promise<void> {
     const { confirmAssignmentAdmin } = await import('@/server/actions/assignments');
     await confirmAssignmentAdmin(orderId, droneId);
+  },
+
+  // Marks an allocated order's assignment (and its drone) as delivered —
+  // either the seller clicking "Mark Delivered", or the tracking view
+  // auto-completing once the simulated flight has reached the destination.
+  async deliverAssignment(orderId: string, assignmentId: string, droneId: string): Promise<void> {
+    const { deliverAssignmentAdmin } = await import('@/server/actions/assignments');
+    await deliverAssignmentAdmin(orderId, assignmentId, droneId);
   },
 };

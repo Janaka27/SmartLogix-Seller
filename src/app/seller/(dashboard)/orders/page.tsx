@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   ClipboardList,
@@ -22,6 +22,7 @@ import {
   ShieldAlert,
   Package,
   MapPin,
+  PackageCheck,
 } from "lucide-react";
 import Image from "next/image";
 import { toast } from "sonner";
@@ -50,7 +51,10 @@ import {
   formatDistance,
   formatVolume,
   formatCurrency,
+  formatDuration,
 } from "@/lib/format";
+import { haversineDistanceKm, interpolatePosition, bearingDegrees } from "@/lib/geo";
+import { TrackingMap } from "@/components/seller/TrackingMap";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -389,14 +393,151 @@ function OrderCard({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Allocated Order Card
+// Allocated Order Card — live flight tracking
 // ─────────────────────────────────────────────────────────────────────────────
 
-function AllocatedOrderCard({ order, items }: { order: any; items: any[] }) {
+const MIN_FLIGHT_MS = 60_000; // floor so very short distances don't look instant
+const BATTERY_DRAIN_PCT = 18; // cosmetic — visual depletion over a full simulated flight
+const MIN_BATTERY_DISPLAY_PCT = 5;
+
+// assignment.departed_at (real, set when the seller confirms) wins when
+// present; older assignments created before that column was populated fall
+// back to a per-browser synthesized start time, persisted so a refresh
+// doesn't restart the simulated flight.
+function getFlightStartMs(assignmentId: string, departedAt: string | null): number {
+  if (departedAt) return new Date(departedAt).getTime();
+  if (typeof window === "undefined") return Date.now();
+
+  const key = `smartlogix-seller-flight-start-${assignmentId}`;
+  const stored = window.localStorage.getItem(key);
+  if (stored) {
+    const parsed = Number(stored);
+    if (!Number.isNaN(parsed)) return parsed;
+  }
+  const now = Date.now();
+  window.localStorage.setItem(key, String(now));
+  return now;
+}
+
+interface FlightState {
+  progress: number;
+  position: { lat: number; lng: number };
+  heading: number;
+  batteryPct: number;
+  remainingMinutes: number;
+}
+
+function computeFlightState(
+  origin: { lat: number; lng: number },
+  destination: { lat: number; lng: number },
+  distanceKm: number,
+  speedKmh: number,
+  batteryCapacityPct: number,
+  flightStartMs: number,
+  now: number,
+): FlightState {
+  const totalFlightMs = Math.max(MIN_FLIGHT_MS, (distanceKm / speedKmh) * 3_600_000);
+  const elapsedMs = now - flightStartMs;
+  const progress = Math.min(1, Math.max(0, elapsedMs / totalFlightMs));
+
+  return {
+    progress,
+    position: interpolatePosition(origin, destination, progress),
+    heading: bearingDegrees(origin, destination),
+    batteryPct: Math.max(MIN_BATTERY_DISPLAY_PCT, Math.round(batteryCapacityPct - progress * BATTERY_DRAIN_PCT)),
+    remainingMinutes: (totalFlightMs * (1 - progress)) / 60_000,
+  };
+}
+
+function AllocatedOrderCard({
+  order,
+  items,
+  warehouse,
+  onDelivered,
+}: {
+  order: any;
+  items: any[];
+  warehouse: { latitude: number; longitude: number; name: string } | null;
+  onDelivered: (orderId: string) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  const [markingDelivered, setMarkingDelivered] = useState(false);
+  const deliveredFiredRef = useRef(false);
   const shortId = order.id.slice(0, 8).toUpperCase();
   const assignment = order.drone_assignment;
   const drone = assignment?.drone;
+
+  const origin = warehouse ? { lat: Number(warehouse.latitude), lng: Number(warehouse.longitude) } : null;
+  const destination =
+    order.delivery_lat != null && order.delivery_lng != null
+      ? { lat: Number(order.delivery_lat), lng: Number(order.delivery_lng) }
+      : null;
+  const distanceKm =
+    order.distance_km != null
+      ? Number(order.distance_km)
+      : origin && destination
+        ? haversineDistanceKm(origin, destination)
+        : null;
+
+  const alreadyDelivered = assignment?.status === "delivered";
+  const canTrack = Boolean(assignment && drone && origin && destination && distanceKm != null);
+
+  const flightStartMs = assignment && canTrack ? getFlightStartMs(assignment.id, assignment.departed_at) : null;
+  const flight =
+    canTrack && !alreadyDelivered && flightStartMs && origin && destination && distanceKm != null
+      ? computeFlightState(
+          origin,
+          destination,
+          distanceKm,
+          Number(drone.speed_kmh),
+          Number(drone.battery_capacity_pct),
+          flightStartMs,
+          now,
+        )
+      : null;
+
+  const isDeliveredLocally = alreadyDelivered || (flight?.progress ?? 0) >= 1;
+
+  // Tick the simulated flight forward while an assignment is in progress.
+  useEffect(() => {
+    if (!canTrack || alreadyDelivered) return;
+    const tick = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(tick);
+  }, [canTrack, alreadyDelivered]);
+
+  // Auto-complete once the simulated flight reaches the destination.
+  useEffect(() => {
+    if (!flight || flight.progress < 1 || alreadyDelivered || deliveredFiredRef.current) return;
+    deliveredFiredRef.current = true;
+    SellerService.deliverAssignment(order.id, assignment.id, drone.id)
+      .then(() => {
+        toast.success(`Order ${shortId} delivered.`);
+        onDelivered(order.id);
+      })
+      .catch(() => {
+        deliveredFiredRef.current = false;
+      });
+    // Depends on flight.progress (not the flight object, which is a new
+    // reference every tick) so this only re-evaluates when progress crosses
+    // the completion threshold.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [flight?.progress, alreadyDelivered, assignment?.id, drone?.id, order.id, shortId, onDelivered, deliveredFiredRef]);
+
+  const handleMarkDelivered = async () => {
+    if (!assignment || !drone || markingDelivered) return;
+    setMarkingDelivered(true);
+    try {
+      await SellerService.deliverAssignment(order.id, assignment.id, drone.id);
+      deliveredFiredRef.current = true;
+      toast.success("Order marked delivered.");
+      onDelivered(order.id);
+    } catch (err: any) {
+      toast.error(err?.message ?? "Failed to mark delivered");
+    } finally {
+      setMarkingDelivered(false);
+    }
+  };
 
   return (
     <Card className="overflow-hidden bg-card transition-all hover:shadow-sm">
@@ -409,9 +550,15 @@ function AllocatedOrderCard({ order, items }: { order: any; items: any[] }) {
                 <Zap className="mr-0.5 h-3 w-3" /> Urgent
               </Badge>
             )}
-            <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
-              Allocated
-            </Badge>
+            {isDeliveredLocally ? (
+              <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-700">
+                <PackageCheck className="mr-1 h-3 w-3" /> Delivered
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
+                Allocated
+              </Badge>
+            )}
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(order.created_at)}</p>
         </div>
@@ -446,7 +593,9 @@ function AllocatedOrderCard({ order, items }: { order: any; items: any[] }) {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground">Assignment Status</p>
-                  <p className="text-sm font-medium capitalize">{assignment.status}</p>
+                  <p className="text-sm font-medium capitalize">
+                    {isDeliveredLocally ? "Delivered" : assignment.status}
+                  </p>
                 </div>
                 {drone && (
                   <>
@@ -473,6 +622,67 @@ function AllocatedOrderCard({ order, items }: { order: any; items: any[] }) {
               <p className="text-sm text-muted-foreground">No assignment details found.</p>
             )}
           </div>
+
+          {canTrack && origin && destination && distanceKm != null && (
+            <div className="border-t border-border px-5 py-4">
+              <div className="mb-3 flex items-center justify-between">
+                <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  Live Tracking
+                </h4>
+                {!isDeliveredLocally && (
+                  <Button size="sm" variant="outline" disabled={markingDelivered} onClick={handleMarkDelivered}>
+                    {markingDelivered ? (
+                      <>
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        Marking…
+                      </>
+                    ) : (
+                      <>
+                        <PackageCheck className="mr-1.5 h-3.5 w-3.5" />
+                        Mark Delivered
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+
+              <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+                <div className="overflow-hidden rounded-lg border border-border">
+                  <TrackingMap
+                    origin={{ lat: origin.lat, lng: origin.lng, label: warehouse?.name ?? "Warehouse" }}
+                    destination={{ lat: destination.lat, lng: destination.lng, label: "Delivery address" }}
+                    dronePosition={isDeliveredLocally ? destination : (flight?.position ?? origin)}
+                    headingDegrees={flight?.heading ?? bearingDegrees(origin, destination)}
+                    className="h-64 w-full"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 content-start">
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <p className="text-xs text-muted-foreground">
+                      {isDeliveredLocally ? "Status" : "Time remaining"}
+                    </p>
+                    <p className="text-lg font-semibold">
+                      {isDeliveredLocally ? "Delivered" : formatDuration(flight?.remainingMinutes ?? 0)}
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <p className="text-xs text-muted-foreground">Distance</p>
+                    <p className="text-lg font-semibold">{formatDistance(distanceKm)}</p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <p className="text-xs text-muted-foreground">Battery</p>
+                    <p className="text-lg font-semibold">
+                      {isDeliveredLocally ? MIN_BATTERY_DISPLAY_PCT : (flight?.batteryPct ?? drone.battery_capacity_pct)}%
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-border bg-card p-3">
+                    <p className="text-xs text-muted-foreground">Speed</p>
+                    <p className="text-lg font-semibold">{drone.speed_kmh} km/h</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {items.length > 0 && (
             <div className="border-t border-border px-5 py-4">
@@ -548,6 +758,7 @@ export default function SellerOrdersPage() {
   const [error, setError] = useState<string | null>(null);
   const [results, setResults] = useState<EnrichedResult[]>([]);
   const [allocatedData, setAllocatedData] = useState<{ orders: any[], orderItems: any[] } | null>(null);
+  const [warehouse, setWarehouse] = useState<{ latitude: number; longitude: number; name: string } | null>(null);
   const [confirming, setConfirming] = useState<Record<string, boolean>>({});
   const [outcomeFilter, setOutcomeFilter] = useState<"ALL" | "ASSIGN" | "SPLIT" | "HOLD">("ALL");
 
@@ -561,6 +772,7 @@ export default function SellerOrdersPage() {
 
       const warehouse = await WarehouseService.getBySeller(user.id);
       if (!warehouse) { setError("No warehouse found. Set up your warehouse first."); return; }
+      setWarehouse(warehouse);
 
       const { orders, orderItems, drones, productsById, dronesById } =
         await SellerService.getOrderDashboardData(warehouse.id);
@@ -612,7 +824,9 @@ export default function SellerOrdersPage() {
     }
   }, [router]);
 
-  useEffect(() => { runPipeline(); }, [runPipeline]);
+  useEffect(() => {
+    Promise.resolve().then(() => runPipeline());
+  }, [runPipeline]);
 
   // ── Confirm assignment ───────────────────────────────────────────────────────
   const handleConfirm = async (orderId: string, droneId: string) => {
@@ -629,6 +843,14 @@ export default function SellerOrdersPage() {
       setConfirming((prev) => ({ ...prev, [orderId]: false }));
     }
   };
+
+  // ── Deliver assignment ───────────────────────────────────────────────────────
+  // Deliberately a no-op here: the card already shows "Delivered" from its
+  // own locally computed state and owns its own toast, and leaving the card
+  // in place (instead of refetching immediately) lets that confirmation
+  // actually be seen. It naturally drops out of this Allocated list (query
+  // filters status='allocated') the next time the seller hits Refresh.
+  const handleDelivered = useCallback(() => {}, []);
 
   const filtered = useMemo(
     () => outcomeFilter === "ALL" ? results : results.filter((r) => r.outcome === outcomeFilter),
@@ -737,6 +959,8 @@ export default function SellerOrdersPage() {
                   key={order.id}
                   order={order}
                   items={allocatedItemsByOrderId.get(order.id) ?? []}
+                  warehouse={warehouse}
+                  onDelivered={handleDelivered}
                 />
               ))}
             </div>
