@@ -12,6 +12,7 @@ export interface DroneRow {
   id: string;
   max_payload_kg: number;
   home_warehouse_id: string;
+  status: string; // only 'available' drones are used
 }
 
 export type DecisionOutcome = 'ASSIGN' | 'SPLIT' | 'HOLD';

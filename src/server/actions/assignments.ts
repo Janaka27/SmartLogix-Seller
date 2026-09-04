@@ -20,3 +20,21 @@ export async function confirmAssignmentAdmin(orderId: string, droneId: string) {
     throw new Error(`Failed to confirm assignment: ${error.message}`);
   }
 }
+
+/**
+ * Marks an in-flight assignment (and its order and drone) as delivered.
+ * Same RLS-bypass rationale as confirmAssignmentAdmin above.
+ */
+export async function deliverAssignmentAdmin(orderId: string, assignmentId: string, droneId: string) {
+  const supabase = createAdminClient();
+
+  const { error } = await supabase.rpc("deliver_drone_assignment", {
+    p_order_id: orderId,
+    p_assignment_id: assignmentId,
+    p_drone_id: droneId,
+  });
+
+  if (error) {
+    throw new Error(`Failed to mark assignment delivered: ${error.message}`);
+  }
+}
