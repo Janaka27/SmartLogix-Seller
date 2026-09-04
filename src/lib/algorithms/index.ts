@@ -6,6 +6,12 @@ export { runPrim } from "./prim";
 export { runKnapsack, type KnapsackItem, type KnapsackResult } from "./knapsack";
 export { runSimulatedAnnealing, type TourStop } from "./simulated-annealing";
 export {
+  runMultiDroneBatching,
+  type DroneCapacity,
+  type DroneBatch,
+  type MultiDroneBatchingResult,
+} from "./multi-drone-batching";
+export {
   classifyFeasibility,
   MAX_FLEET_PAYLOAD_KG,
   MAX_FLEET_CARGO_VOLUME_CM3,

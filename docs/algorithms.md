@@ -25,7 +25,24 @@ They should always agree on distance (no negative edges) — what differs is `no
 
 ## Delivery Batching — Knapsack then Simulated Annealing
 
-Two-step console over `BATCHING_ORDERS`/`BATCHING_DEPOT`/`BATCHING_DRONE_CAPACITY` (`src/lib/algorithms/data/batching-orders.ts`): 9 candidate orders around one depot, more total weight/volume than one drone can carry.
+The console has two tabs, both over the same `BATCHING_ORDERS`/`BATCHING_DEPOT`/`BATCHING_DRONE_CAPACITY` demo queue (`src/lib/algorithms/data/batching-orders.ts`): 9 candidate orders around one depot, more total weight/volume than one drone can carry.
+
+### Multi-Drone Batching (default tab) — `multi-drone-batching.ts`
+
+This is Task 5 as re-scoped for the drone marketplace ("multi-drone delivery batching — one drone doing 2-4 lightweight stops in one flight before returning to base, closed-loop tour per drone" per `SmartLogix_Two_Site_Structure_Guide.md`), rather than the single-vehicle VRP/TSP from the original coursework doc.
+
+**"Run Multi-Drone Batch"** clusters the *entire* queue across a fleet, not just one drone:
+
+1. Sort all orders by polar angle (bearing) from the depot — a sweep line.
+2. Compute the minimum fleet size from three lower bounds: `⌈orders / 4⌉` (the 2-4 stop cap), `⌈totalWeight / maxWeightKg⌉`, `⌈totalVolume / maxVolumeCm3⌉`.
+3. Split the angle-sorted list into that many contiguous, near-equal chunks; if any chunk still breaks the stop cap or a capacity limit, grow the fleet by one drone and re-split (bounded by one drone per order).
+4. Run `simulated-annealing.ts` independently per chunk to sequence each drone's closed loop.
+
+This is the standard cluster-first-route-second heuristic for turning a single-vehicle TSP solver into a multi-vehicle routing solution. `GraphCanvas` renders every drone's tour simultaneously, one color per drone (`GraphNode.color` / `GraphEdge.color`), with a summary card per drone (stops, weight/volume utilization, tour distance).
+
+### Single Drone (secondary tab) — `knapsack.ts` then `simulated-annealing.ts`
+
+The original two-step demo, kept for comparison against the multi-drone version:
 
 1. **"Run Order Selection"** → `knapsack.ts`: 0/1 DP over weight (discretized to 0.1kg steps), then volume is applied as a *feasibility filter* on the DP-optimal set — dropping the lowest value-per-volume items until it fits. This intentionally mirrors the simplification suggested in the original design doc for the 2-constraint (weight + volume) variant, and can produce a lower total value than a true 2D DP would — that gap is a deliberate discussion point, not a bug.
 2. **"Sequence Tour"** → `simulated-annealing.ts`: swap + geometric cooling schedule over the selected stops, producing a closed loop (depot → stops → depot). Seeded with a fixed PRNG (`seeded-random.ts`) so the result is reproducible run to run. Returns `costHistory` (charted as the convergence line) and the final tour order, drawn as a real polyline on `GraphCanvas`.

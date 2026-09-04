@@ -6,6 +6,8 @@ interface GraphCanvasProps {
   edges: GraphEdge[];
   highlightedPath?: string[];
   highlightedEdges?: GraphEdge[];
+  /** Extra node ids to render at "on path" size — for multi-tour views where each tour supplies its own edge colors instead of a single highlightedPath. */
+  activeNodeIds?: string[];
   className?: string;
 }
 
@@ -25,6 +27,7 @@ export function GraphCanvas({
   edges,
   highlightedPath,
   highlightedEdges,
+  activeNodeIds,
   className,
 }: GraphCanvasProps) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -63,8 +66,9 @@ export function GraphCanvas({
               y1={from.y}
               x2={to.x}
               y2={to.y}
-              className={isHighlighted ? "stroke-orange-500" : "stroke-slate-200"}
-              strokeWidth={isHighlighted ? 3 : 1.5}
+              className={edge.color ? undefined : isHighlighted ? "stroke-orange-500" : "stroke-slate-200"}
+              style={edge.color ? { stroke: edge.color } : undefined}
+              strokeWidth={edge.color || isHighlighted ? 3 : 1.5}
               strokeDasharray={edge.noFlyPenalty ? "4 3" : undefined}
             />
             <text
@@ -73,8 +77,9 @@ export function GraphCanvas({
               textAnchor="middle"
               className={cn(
                 "text-[9px]",
-                isHighlighted ? "fill-orange-700 font-semibold" : "fill-slate-400"
+                !edge.color && (isHighlighted ? "fill-orange-700 font-semibold" : "fill-slate-400")
               )}
+              style={edge.color ? { fill: edge.color, fontWeight: 600 } : undefined}
             >
               {edge.weight}
             </text>
@@ -83,7 +88,7 @@ export function GraphCanvas({
       })}
 
       {nodes.map((node) => {
-        const isOnPath = highlightedPath?.includes(node.id);
+        const isOnPath = highlightedPath?.includes(node.id) || activeNodeIds?.includes(node.id);
         return (
           <g key={node.id}>
             <circle
@@ -91,7 +96,8 @@ export function GraphCanvas({
               cy={node.y}
               r={isOnPath ? 9 : 7}
               strokeWidth={2}
-              className={cn(NODE_COLORS[node.type], isOnPath && "stroke-orange-600")}
+              className={cn(!node.color && NODE_COLORS[node.type], !node.color && isOnPath && "stroke-orange-600")}
+              style={node.color ? { fill: node.color, stroke: node.color } : undefined}
             />
             <text
               x={node.x}
