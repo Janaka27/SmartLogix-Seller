@@ -601,7 +601,7 @@ function AllocatedOrderCard({
           <p className="mt-1 text-xs text-muted-foreground">{formatDateTime(order.created_at)}</p>
         </div>
         <div className="flex items-center gap-2">
-          {canTrack && !isDeliveredLocally && (
+          {canTrack && (
             <Button size="sm" variant="outline" onClick={handleFindPath}>
               Find Path
             </Button>
@@ -761,7 +761,7 @@ function AllocatedOrderCard({
       )}
 
       <Dialog open={showPathMap} onOpenChange={setShowPathMap}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Optimal Flight Path</DialogTitle>
           </DialogHeader>

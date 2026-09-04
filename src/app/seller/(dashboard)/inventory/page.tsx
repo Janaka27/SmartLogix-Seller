@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
-import { Package, Pencil, Plus, Boxes, Warehouse as WarehouseIcon } from "lucide-react";
+import Link from "next/link";
+import { Package, Pencil, Plus, Boxes, Warehouse as WarehouseIcon, Network } from "lucide-react";
 
 import { PageHeader } from "@/components/dashboard/PageHeader";
 import { StatusBadge } from "@/components/dashboard/StatusBadge";
@@ -241,9 +242,17 @@ export default function SellerInventoryPage() {
         }
         actions={
           hasWarehouse && (
-            <Button onClick={openAddWarehouse}>
-              <Plus /> Add Warehouse
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" asChild>
+                <Link href="/seller/network">
+                  <Network className="mr-2 h-4 w-4" />
+                  Network Analysis
+                </Link>
+              </Button>
+              <Button onClick={openAddWarehouse}>
+                <Plus /> Add Warehouse
+              </Button>
+            </div>
           )
         }
       />
