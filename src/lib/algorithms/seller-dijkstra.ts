@@ -34,6 +34,7 @@ export function dijkstra(
   start: string,
   end: string
 ) {
+  console.log(`[Dijkstra] Initializing algorithm from start node: ${start} to end node: ${end}`);
   const distances: Record<string, number> = {};
   const previous: Record<string, string | null> = {};
 
@@ -83,9 +84,11 @@ export function dijkstra(
 
 
   if (distances[end] === Infinity) {
+    console.log(`[Dijkstra] No route found to end node: ${end}`);
     return null;
   }
 
+  console.log(`[Dijkstra] Route found with distance: ${distances[end]}`);
   const route: Node[] = [];
 
   let current: string | null = end;
@@ -109,6 +112,7 @@ export function dijkstra(
 
 // Build graph by adding all warehouses
 export function buildGraph(warehouses: any[], maxRange?: number) {
+  console.log(`[BuildGraph] Building graph for ${warehouses.length} warehouses. Max Range: ${maxRange || 'Unlimited'}`);
   const nodes: Node[] = warehouses.map(w => ({
     id: w.id,
     lat: w.latitude,
@@ -149,8 +153,10 @@ export function buildGraph(warehouses: any[], maxRange?: number) {
 
 // Get route from source to drop point
 export function getRoute(warehouses: any[], sourceId: string, dropPoint: { lat: number, lng: number }, maxRange?: number) {
+  console.log(`[GetRoute] Calculating route from source: ${sourceId} to drop point: (${dropPoint.lat}, ${dropPoint.lng})`);
   const { nodes, edges } = buildGraph(warehouses, maxRange);
 
+  console.log(`[GetRoute] Graph built with ${nodes.length} nodes and ${edges.length} edges`);
   const dropNodeId = "user-drop-point";
   nodes.push({ id: dropNodeId, lat: dropPoint.lat, lng: dropPoint.lng, name: "Delivery point" });
 
